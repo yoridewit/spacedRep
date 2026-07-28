@@ -1,0 +1,38 @@
+{
+  "deck": "Voorbeeld — hoe werkt spaced repetition",
+  "description": "Een klein demodeck om de app uit te proberen. Verwijder het gerust.",
+  "cards": [
+    {
+      "front": "Wat is spaced repetition?",
+      "back": "Leren met steeds groter wordende tussenpozen, vlak voordat je iets zou vergeten.",
+      "tags": ["basis"]
+    },
+    {
+      "front": "Waarom werkt herhalen vlak voor het vergeten zo goed?",
+      "back": "Het terughalen kost dan moeite, en juist die moeite versterkt het geheugenspoor.",
+      "note": "Dit heet het testing effect: jezelf overhoren werkt beter dan herlezen.",
+      "tags": ["basis"]
+    },
+    {
+      "front": "Wat betekent \"Opnieuw\" bij het beoordelen?",
+      "back": "Je wist het antwoord niet. De kaart komt binnen een paar minuten terug en het interval wordt korter.",
+      "tags": ["gebruik"]
+    },
+    {
+      "front": "Wat is een goede omvang voor één flashcard?",
+      "back": "Eén feit. Kun je het antwoord niet in één adem geven, splits de kaart dan.",
+      "hint": "denk aan het minimum-informatieprincipe",
+      "tags": ["gebruik"]
+    },
+    {
+      "type": "cloze",
+      "text": "Een kaart met een gat heet een {{c1::cloze}}-kaart; het gat schrijf je als {{c2::dubbele accolades met c1}}.",
+      "tags": ["gebruik"]
+    },
+    {
+      "front": "Hoeveel nieuwe kaarten per dag is een verstandige start?",
+      "back": "Ongeveer 20. Elke nieuwe kaart levert later ongeveer tien herhalingen op.",
+      "tags": ["planning"]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "decks": [
+    {
+      "file": "voorbeeld.json",
+      "name": "Voorbeeld — hoe werkt spaced repetition",
+      "description": "Klein demodeck om de app uit te proberen",
+      "cards": 7
+    }
+  ]
+}

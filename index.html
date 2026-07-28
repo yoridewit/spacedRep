@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kaartjes</title>
+<meta name="description" content="Flashcards met spaced repetition. Werkt offline, alles blijft op je eigen toestel.">
+<meta name="theme-color" content="#f5ead8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Kaartjes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/caprasimo-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+  <header class="appbar" id="topbar"></header>
+  <main id="view" class="view"></main>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<dialog id="dialog" class="dialog"></dialog>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
