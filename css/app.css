@@ -413,6 +413,59 @@ textarea.input {
 .empty { text-align: center; padding: var(--space-8) var(--space-4); }
 .empty .big { font-size: 44px; line-height: 1; margin-bottom: var(--space-3); }
 
+/* ── inlogscherm ───────────────────────────────────────────────────────── */
+
+.view.view-auth {
+  justify-content: center;
+  padding-top: calc(var(--safe-top) + var(--space-6));
+  max-width: 520px;
+}
+
+.auth { width: 100%; }
+
+.auth-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-6) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.auth-title { text-align: center; font-size: 34px; margin-bottom: var(--space-1); }
+
+.auth-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin: var(--space-3) 0 var(--space-2);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+.auth-tab {
+  flex: 1;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-heading);
+  font-size: 14px;
+  color: var(--color-text);
+  padding: 9px 12px;
+  border-radius: 999px;
+}
+.auth-tab.is-active { background: var(--color-accent); color: var(--color-bg); }
+
+.auth-divider {
+  border: 0;
+  height: 1px;
+  background: var(--color-divider);
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.btn-ghost { color: var(--color-accent-700); background: transparent; border: none; }
+.btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+
 /* ── leerscherm ────────────────────────────────────────────────────────── */
 
 .study-main {

@@ -17,6 +17,7 @@ import { looksSecret, SECRET_KEY_WARNING } from './keycheck.js';
 const CONFIG_KEY = 'kaartjes.supabase.v1';
 const SESSION_KEY = 'kaartjes.session.v1';
 const META_KEY = 'kaartjes.sync.v1';
+const SKIP_KEY = 'kaartjes.zonder-account.v1';
 
 const TABLE = 'sync_state';
 const MAX_ATTEMPTS = 3;
@@ -88,6 +89,20 @@ export function isSignedIn() {
   return Boolean(getSession()?.refresh_token);
 }
 
+/** Heeft de gebruiker gekozen om zonder account door te gaan? */
+export function authSkipped() {
+  try {
+    return localStorage.getItem(SKIP_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function skipAuth(skip = true) {
+  if (skip) localStorage.setItem(SKIP_KEY, '1');
+  else localStorage.removeItem(SKIP_KEY);
+}
+
 export function meta() {
   return readJson(META_KEY) || { lastSync: null, revision: null };
 }
@@ -149,6 +164,7 @@ function storeSession(data) {
 // ---------- aanmelden ----------
 
 export async function signIn(email, password) {
+  skipAuth(false);
   const { ok, status, data } = await request('/auth/v1/token', {
     method: 'POST',
     query: '?grant_type=password',
@@ -183,6 +199,56 @@ export async function signOut() {
   }
   clearSession();
   setMeta({ revision: null });
+  skipAuth(false); // volgende keer weer het inlogscherm
+}
+
+/**
+ * Stuurt een herstelmail. De link daarin komt terug op `redirectTo`; die URL
+ * moet in Supabase onder Authentication → URL Configuration toegestaan zijn.
+ */
+export async function requestPasswordReset(email, redirectTo = `${location.origin}${location.pathname}`) {
+  const { ok, status, data } = await request('/auth/v1/recover', {
+    method: 'POST',
+    query: `?redirect_to=${encodeURIComponent(redirectTo)}`,
+    auth: false,
+    body: { email: String(email).trim() },
+  });
+  if (!ok) throw new SyncError(authMessage(status, data));
+  return true;
+}
+
+/**
+ * Neemt de tokens over die in de link uit een herstelmail zitten en haalt
+ * daarna het profiel op, want id en e-mailadres staan niet in die link.
+ */
+export async function adoptTokens({ accessToken, refreshToken, expiresIn }) {
+  setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken || null,
+    expires_at: Date.now() + (Number(expiresIn) || 3600) * 1000,
+    email: null,
+    user_id: null,
+  });
+  const { ok, data } = await request('/auth/v1/user');
+  if (!ok) {
+    clearSession();
+    throw new SyncError('Deze herstellink is verlopen. Vraag een nieuwe aan.');
+  }
+  setSession({ ...getSession(), email: data.email || null, user_id: data.id || null });
+  skipAuth(false);
+  return getSession();
+}
+
+/** Zet een nieuw wachtwoord voor de ingelogde gebruiker. */
+export async function updatePassword(password) {
+  if (String(password).length < 6) throw new SyncError('Het wachtwoord moet minstens 6 tekens hebben.');
+  await ensureToken();
+  const { ok, status, data } = await rest('/auth/v1/user', {
+    method: 'PUT',
+    body: { password },
+  });
+  if (!ok) throw new SyncError(authMessage(status, data));
+  return true;
 }
 
 async function refreshSession() {

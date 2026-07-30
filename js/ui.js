@@ -19,6 +19,19 @@ export function el(tag, attrs = {}, children = []) {
   return node;
 }
 
+/**
+ * Zet kinderen in een element en slaat null/undefined/false over. Nodig omdat
+ * het DOM van `append(null)` de letterlijke tekst "null" maakt — precies het
+ * soort fout dat je pas op je telefoon ziet.
+ */
+export function appendAll(parent, ...children) {
+  for (const child of children.flat()) {
+    if (child === null || child === undefined || child === false) continue;
+    parent.append(child instanceof Node ? child : document.createTextNode(String(child)));
+  }
+  return parent;
+}
+
 export function clear(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
   return node;

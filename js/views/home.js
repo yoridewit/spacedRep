@@ -1,21 +1,21 @@
 import { store } from '../store.js';
 import { mastery } from '../gamify.js';
-import { isConfigured, isSignedIn, getSession, meta } from '../sync.js';
+import { isConfigured, isSignedIn, authSkipped, getSession, meta } from '../sync.js';
 import { versionLine } from '../version.js';
-import { el, plural } from '../ui.js';
+import { el, appendAll, plural } from '../ui.js';
 import { navigate } from '../app.js';
 
 /** Uitnodiging om in te loggen, zolang synchroniseren nog niet aanstaat. */
 function syncCard() {
   if (!isConfigured()) return null;
-  if (isSignedIn()) return null;
+  if (isSignedIn() || !authSkipped()) return null;
   return el('div', { class: 'panel', style: 'margin-bottom:var(--space-6)' }, [
-    el('h3', { style: 'margin-bottom:var(--space-1)', text: 'Synchroniseren staat klaar' }),
-    el('p', { class: 'small muted', text: 'Log in en je kaarten en voortgang lopen gelijk op je telefoon en je pc.' }),
+    el('h3', { style: 'margin-bottom:var(--space-1)', text: 'Je werkt zonder account' }),
+    el('p', { class: 'small muted', text: 'Je kaarten staan alleen op dit apparaat. Log in en ze lopen gelijk met je andere apparaten.' }),
     el('button', {
       class: 'btn btn-primary btn-block',
-      onclick: () => navigate('#/settings'),
-      text: 'Inloggen',
+      onclick: () => navigate('#/inloggen'),
+      text: 'Alsnog inloggen',
     }),
   ]);
 }
@@ -70,7 +70,8 @@ export function mount(root) {
   const total = store.counts();
 
   if (!decks.length) {
-    root.append(
+    appendAll(
+      root,
       el('section', { class: 'empty' }, [
         el('div', { class: 'big', text: '🍂' }),
         el('h1', { text: 'Nog geen decks' }),
@@ -83,7 +84,8 @@ export function mount(root) {
     return;
   }
 
-  root.append(
+  appendAll(
+    root,
     el('section', {}, [
       el('h1', { style: 'margin-bottom:4px', text: total.due ? 'Zo, aan de slag?' : 'Alles bij' }),
       el('p', {

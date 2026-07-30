@@ -4,18 +4,19 @@ import { store } from './store.js';
 import { el, clear, toast } from './ui.js';
 import { icon } from './icons.js';
 import { totalXp, levelInfo, streak } from './gamify.js';
-import { syncQuietly, scheduleSync, flushSync, isSignedIn } from './sync.js';
+import { syncQuietly, scheduleSync, flushSync, isSignedIn, isConfigured, authSkipped, adoptTokens } from './sync.js';
 import * as home from './views/home.js';
 import * as study from './views/study.js';
 import * as add from './views/add.js';
 import * as deck from './views/deck.js';
 import * as stats from './views/stats.js';
 import * as settings from './views/settings.js';
+import * as auth from './views/auth.js';
 
 const viewRoot = document.getElementById('view');
 const topbar = document.getElementById('topbar');
 
-const ROUTES = { home, study, add, deck, stats, settings };
+const ROUTES = { home, study, add, deck, stats, settings, auth };
 
 const TABS = [
   { href: '#/', label: 'Decks', match: (r) => r.name === 'home' || r.name === 'deck' },
@@ -35,6 +36,7 @@ function parseRoute() {
   const [name, ...rest] = parts;
   if (name === 'share') return { name: 'add', params: { ...params, share: rest.join('/') } };
   if (name === 'sync') return { name: 'settings', params: { ...params, sync: rest.join('/') } };
+  if (name === 'inloggen') return { name: 'auth', params: { ...params, mode: rest[0] || 'in' } };
   if (!ROUTES[name]) return { name: 'home', params };
   return { name, params: { ...params, id: rest[0] ? decodeURIComponent(rest[0]) : undefined } };
 }
@@ -79,15 +81,22 @@ function appHeader(route) {
   ];
 }
 
+/** Zolang je niet ingelogd bent én niet bewust zonder account werkt: eerst inloggen. */
+function needsAuth(route) {
+  if (route.name === 'auth') return false;
+  return isConfigured() && !isSignedIn() && !authSkipped();
+}
+
 function render() {
-  const route = parseRoute();
+  const route = needsAuth(parseRoute()) ? { name: 'auth', params: { mode: 'in' } } : parseRoute();
   current = route;
   if (typeof cleanup === 'function') cleanup();
   cleanup = null;
   clear(viewRoot);
   viewRoot.className = 'view';
   window.scrollTo(0, 0);
-  setChrome(appHeader(route));
+  topbar.hidden = route.name === 'auth';
+  if (!topbar.hidden) setChrome(appHeader(route));
   try {
     cleanup = ROUTES[route.name].mount(viewRoot, route.params) || null;
   } catch (err) {
@@ -106,6 +115,32 @@ function applyTheme() {
   const dark = theme === 'dark' || (theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.classList.toggle('theme-dark', dark);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#17130f' : '#f5ead8');
+}
+
+/**
+ * Supabase stuurt na een herstelmail terug met de tokens in de hash. Die halen
+ * we eruit voordat de router hem als route probeert te lezen.
+ */
+async function consumeAuthHash() {
+  const raw = location.hash.startsWith('#') ? location.hash.slice(1) : '';
+  if (!raw.includes('access_token=')) return false;
+  const params = new URLSearchParams(raw);
+  const accessToken = params.get('access_token');
+  if (!accessToken) return false;
+  const recovery = params.get('type') === 'recovery';
+  history.replaceState(null, '', `${location.pathname}${location.search}`);
+  try {
+    await adoptTokens({
+      accessToken,
+      refreshToken: params.get('refresh_token'),
+      expiresIn: params.get('expires_in'),
+    });
+    location.hash = recovery ? '#/inloggen/herstel' : '#/';
+  } catch (err) {
+    location.hash = '#/inloggen';
+    setTimeout(() => toast(err.message, 5000), 300);
+  }
+  return true;
 }
 
 store.load();
@@ -127,7 +162,12 @@ store.addEventListener('change', (e) => {
   scheduleSync();
 });
 
-window.addEventListener('hashchange', render);
+window.addEventListener('hashchange', async () => {
+  // Staat de app al open als je op de link uit een herstelmail klikt, dan komt
+  // die alleen als hashwijziging binnen — dus ook hier eerst de tokens eruit.
+  if (await consumeAuthHash()) return;
+  render();
+});
 window.addEventListener('pagehide', () => {
   store.save({ immediate: true });
   flushSync();
@@ -141,7 +181,8 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-render();
+const handledAuthHash = await consumeAuthHash();
+if (!handledAuthHash) render();
 
 if (isSignedIn()) syncQuietly();
 window.addEventListener('online', () => syncQuietly());

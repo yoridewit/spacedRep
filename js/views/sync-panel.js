@@ -1,7 +1,7 @@
 /** Het blok "Synchronisatie" in de instellingen. */
 
 import * as sync from '../sync.js';
-import { el, clear, toast, confirmDialog, copyToClipboard, encodeShare, decodeShare, plural } from '../ui.js';
+import { el, clear, appendAll, toast, confirmDialog, copyToClipboard, encodeShare, decodeShare, plural } from '../ui.js';
 import { refresh } from '../app.js';
 
 function relativeTime(ts) {
@@ -52,7 +52,8 @@ export function syncPanel(params = {}) {
     const url = el('input', { class: 'input', type: 'url', placeholder: 'https://xxxx.supabase.co', autocapitalize: 'off', autocorrect: 'off' });
     const key = el('input', { class: 'input', type: 'text', placeholder: 'anon key (publiek)', autocapitalize: 'off', autocorrect: 'off' });
 
-    panel.append(
+    appendAll(
+      panel,
       el('p', { class: 'small muted', text: 'Koppel je Supabase-project om decks en voortgang tussen je telefoon en pc gelijk te houden. Draai eerst supabase/schema.sql in de SQL-editor van je project. Vul je deze gegevens in config.js in, dan hoef je op een nieuw apparaat alleen nog in te loggen.' }),
       el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Project-URL' }), url]),
       el('label', { class: 'field' }, [
@@ -101,7 +102,8 @@ export function syncPanel(params = {}) {
       }
     };
 
-    panel.append(
+    appendAll(
+      panel,
       el('p', { class: 'small muted', text: `Gekoppeld aan ${config.url.replace('https://', '')}. Log in met hetzelfde account op al je apparaten.` }),
       el('label', { class: 'field' }, [el('span', { class: 'label', text: 'E-mail' }), email]),
       el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Wachtwoord' }), password]),
@@ -125,7 +127,8 @@ export function syncPanel(params = {}) {
     const session = sync.getSession();
     const last = sync.meta().lastSync;
 
-    panel.append(
+    appendAll(
+      panel,
       el('p', { class: 'small muted', text: `Ingelogd als ${session.email || 'onbekend'} · laatst gesynchroniseerd ${relativeTime(last)}.` }),
       el('div', { class: 'row' }, [
         el('button', {

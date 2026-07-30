@@ -11,7 +11,7 @@
  * zonder verbinding start.
  */
 
-const CACHE = 'kaartjes-v5';
+const CACHE = 'kaartjes-v6';
 const SHELL = [
   './',
   'index.html',
@@ -39,6 +39,7 @@ const SHELL = [
   'js/views/deck.js',
   'js/views/stats.js',
   'js/views/settings.js',
+  'js/views/auth.js',
   'js/views/sync-panel.js',
   'fonts/caprasimo-latin.woff2',
   'fonts/caprasimo-latin-ext.woff2',
