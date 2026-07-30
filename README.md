@@ -66,17 +66,22 @@ build-stap, en offline werkt gewoon door.
 1. Draai [`supabase/schema.sql`](supabase/schema.sql) in de SQL-editor van je
    project. Dat maakt de tabel `sync_state` met row level security: elke
    gebruiker kan alleen bij zijn eigen rij.
-2. Open in de app **Instellingen → Synchronisatie** en vul je project-URL en
-   **anon key** in (Project Settings → API). Die sleutel is bedoeld om publiek
-   te zijn; RLS doet het echte werk.
-3. Maak een account aan met e-mail en wachtwoord en log in. Staat *Confirm
-   email* aan in je project, klik dan eenmalig op de bevestigingslink.
-4. Op je tweede apparaat: **Koppeling delen met ander apparaat** geeft je een
-   link met de projectgegevens erin, zodat je die sleutel niet hoeft over te
-   typen. Log daar in met hetzelfde account.
+2. Vul je project-URL en **anon key** in [`config.js`](config.js) in (te vinden
+   onder Project Settings → API). Die sleutel is bedoeld om publiek te zijn; RLS
+   doet het echte werk. Zo hoort het bij de app, niet bij het apparaat: op een
+   nieuw toestel hoef je daarna **alleen nog in te loggen**.
+3. Maak in de app een account aan met e-mail en wachtwoord en log in. Staat
+   *Confirm email* aan in je project, klik dan eenmalig op de bevestigingslink.
 
-Er wordt gesynchroniseerd bij het openen van de app, na elke leersessie, zodra
-je weer online komt, en met de knop **Nu synchroniseren**.
+Wil je die gegevens liever niet in de repo, laat `config.js` dan leeg: de app
+vraagt er dan zelf om onder **Instellingen → Synchroniseren**, en de knop
+*Koppeling delen met ander apparaat* geeft je een link met de projectgegevens
+erin zodat je die sleutel niet hoeft over te typen.
+
+Er wordt gesynchroniseerd terwijl je bezig bent (een paar tellen nadat het stil
+wordt), als je de app wegklikt of weer opent, zodra je weer online komt, en met
+de knop **Synchroniseren**. Je kunt dus halverwege een set stoppen op je pc en
+op je telefoon verdergaan waar je gebleven was — ook de daglimieten lopen mee.
 
 ### Hoe het samenvoegen werkt
 
@@ -91,9 +96,10 @@ op inhoud gematcht (`js/merge.js`):
   het **laatst geoefend** is;
 - verwijderde kaarten en decks blijven weg, tenzij je er op het andere apparaat
   ná het verwijderen nog mee bezig bent geweest;
-- dagstatistiek neemt per dag de hoogste stand, zodat opnieuw synchroniseren
-  nooit dubbel telt. Oefen je op één dag op twéé apparaten, dan telt de app die
-  dag de hoogste van de twee in plaats van de som.
+- dagstatistiek wordt per apparaat bijgehouden: bij het samenvoegen wordt per
+  emmertje de hoogste stand genomen en is het totaal gewoon de som. Oefen je op
+  één dag 10 kaarten op je pc en 5 op je telefoon, dan staat er 15 — en twee keer
+  synchroniseren telt nooit dubbel.
 
 Instellingen volgen de laatst gewijzigde kant; alleen het thema blijft een
 voorkeur per apparaat. Het antwoordlogboek wordt niet gesynchroniseerd — dat is
@@ -127,6 +133,7 @@ zodat laat doorleren nog bij gisteren telt. Alles is instelbaar onder
 
 ```
 index.html            de hele app-schil
+config.js             je Supabase-gegevens (optioneel)
 css/app.css           design system ("Organic": Caprasimo + Figtree)
 js/app.js             router en kop
 js/srs.js             SM-2-planner
@@ -134,6 +141,8 @@ js/store.js           opslag (localStorage), wachtrij en daglimieten
 js/parse.js           import-parser (JSON + platte tekst)
 js/markup.js          veilige mini-markdown en cloze-weergave
 js/gamify.js          streak, XP, niveaus, badges
+js/daystats.js        dagtellers per apparaat
+js/device.js          id van dit apparaat (blijft lokaal)
 js/merge.js           samenvoegen van twee apparaten
 js/sync.js            Supabase-client (auth + REST via fetch)
 js/views/*.js         schermen
@@ -147,7 +156,7 @@ tests/run.js          tests voor planner, parser, opmaak, merge en sync
 Geen dependencies, geen build-stap: gewoon ES-modules die de browser zelf laadt.
 
 ```bash
-node tests/run.js        # 51 tests
+node tests/run.js        # 55 tests
 python3 tools/make-icons.py
 ```
 

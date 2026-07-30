@@ -5,6 +5,7 @@ const SHELL = [
   './',
   'index.html',
   'manifest.webmanifest',
+  'config.js',
   'css/app.css',
   'js/app.js',
   'js/store.js',
@@ -57,8 +58,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== location.origin) return;
 
-  // Decks uit de map decks/ mogen best vers zijn; val terug op de cache offline.
-  if (url.pathname.includes('/decks/')) {
+  // Decks en de Supabase-instellingen mogen best vers zijn; val terug op de cache offline.
+  if (url.pathname.includes('/decks/') || url.pathname.endsWith('/config.js')) {
     event.respondWith(
       fetch(request)
         .then((response) => {

@@ -9,6 +9,7 @@ import { parseImport, cardKey, clozeNumbers, ParseError } from '../js/parse.js';
 import { renderMarkup, renderCloze, cardSummary } from '../js/markup.js';
 import { levelInfo, streak, mastery, badges, xpForAnswer } from '../js/gamify.js';
 import { mergeStates, contentKey } from '../js/merge.js';
+import { dayTotal, mergeDay, normalizeDay } from '../js/daystats.js';
 
 let passed = 0;
 const failures = [];
@@ -369,14 +370,43 @@ test('een verwijderd deck neemt zijn kaarten mee', () => {
   eq(Object.keys(state.cards).length, 0);
 });
 
-test('dagstatistiek telt niet dubbel bij opnieuw synchroniseren', () => {
+test('dagstatistiek van twee apparaten wordt opgeteld, niet vergeleken', () => {
   const day = dayKey(NOW, 4);
-  const local = { ...emptyDoc(), stats: { [day]: { reviews: 12, xp: 30, again: 2 } } };
-  const remote = { ...emptyDoc(), stats: { [day]: { reviews: 8, xp: 20, again: 3 } } };
+  const local = { ...emptyDoc(), stats: { [day]: { dev_pc: { reviews: 10, xp: 30, again: 1 } } } };
+  const remote = { ...emptyDoc(), stats: { [day]: { dev_tel: { reviews: 5, xp: 15, again: 0 } } } };
   const once = mergeStates(local, remote).state;
-  eq(once.stats[day], { reviews: 12, xp: 30, again: 3 });
+  eq(dayTotal(once.stats[day]).reviews, 15, '10 op de pc + 5 op de telefoon');
+  eq(dayTotal(once.stats[day]).xp, 45);
+});
+
+test('opnieuw synchroniseren telt niets dubbel', () => {
+  const day = dayKey(NOW, 4);
+  const local = { ...emptyDoc(), stats: { [day]: { dev_pc: { reviews: 10, xp: 30 } } } };
+  const remote = { ...emptyDoc(), stats: { [day]: { dev_tel: { reviews: 5, xp: 15 } } } };
+  const once = mergeStates(local, remote).state;
   const twice = mergeStates(once, remote).state;
   eq(twice.stats[day], once.stats[day], 'tweede keer verandert niets meer');
+  eq(dayTotal(twice.stats[day]).reviews, 15);
+});
+
+test('hetzelfde apparaat dat verder telt overschrijft zijn eigen stand', () => {
+  const verouderd = { dev_pc: { reviews: 4, xp: 12 } };
+  const actueel = { dev_pc: { reviews: 9, xp: 27 } };
+  eq(dayTotal(mergeDay(verouderd, actueel)).reviews, 9, 'hoogste stand per apparaat');
+});
+
+test('oude gegevens zonder apparaat-emmertje blijven meetellen', () => {
+  eq(normalizeDay({ reviews: 7, xp: 21 }), { legacy: { new: 0, reviews: 7, again: 0, hard: 0, good: 0, easy: 0, ms: 0, xp: 21 } });
+  eq(dayTotal({ reviews: 7, xp: 21 }).reviews, 7, 'platte dag blijft leesbaar');
+  eq(dayTotal(normalizeDay({ reviews: 7, xp: 21 })).reviews, 7);
+});
+
+test('XP telt op over apparaten heen', () => {
+  const day = dayKey(NOW, 4);
+  const stats = { [day]: { dev_pc: { reviews: 10, xp: 30 }, dev_tel: { reviews: 5, xp: 15 } } };
+  eq(levelInfo(45).xp, 45);
+  eq(dayTotal(stats[day]).xp, 45);
+  eq(streak(stats, NOW, 4), 1, 'de dag telt één keer voor de streak');
 });
 
 test('de nieuwste instellingen winnen, het thema blijft van het apparaat', () => {

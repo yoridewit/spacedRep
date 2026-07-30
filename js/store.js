@@ -7,6 +7,8 @@ import { DEFAULT_CONFIG, newSrsState, schedule, dayKey, endOfDay, MINUTE } from 
 import { cardKey } from './parse.js';
 import { xpForAnswer } from './gamify.js';
 import { mergeStates, contentKey, emptyTombstones } from './merge.js';
+import { dayTotal, emptyDay, normalizeDay } from './daystats.js';
+import { deviceId } from './device.js';
 
 const STORAGE_KEY = 'spacedrep.state.v1';
 const SCHEMA_VERSION = 1;
@@ -71,6 +73,9 @@ class Store extends EventTarget {
       tombstones: { ...emptyTombstones(), ...(data.tombstones || {}) },
       log: Array.isArray(data.log) ? data.log : [],
     };
+    for (const [day, entry] of Object.entries(state.stats)) {
+      state.stats[day] = normalizeDay(entry);
+    }
     for (const card of Object.values(state.cards)) {
       if (!card.srs) card.srs = newSrsState(Date.now(), state.settings.srs);
       if (!card.type) card.type = 'basic';
@@ -251,14 +256,18 @@ class Store extends EventTarget {
     return this.state.stats;
   }
 
-  today(now = Date.now()) {
+  /** Het emmertje van dit apparaat voor vandaag — hier wordt in geteld. */
+  todayBucket(now = Date.now()) {
     const key = dayKey(now, this.settings.dayCutoffHour);
-    if (!this.state.stats[key]) {
-      this.state.stats[key] = { new: 0, reviews: 0, again: 0, hard: 0, good: 0, easy: 0, ms: 0, xp: 0 };
-    }
-    const day = this.state.stats[key];
-    if (day.xp === undefined) day.xp = 0;
-    return day;
+    const device = deviceId();
+    const day = (this.state.stats[key] = normalizeDay(this.state.stats[key]));
+    if (!day[device]) day[device] = emptyDay();
+    return day[device];
+  }
+
+  /** Wat er vandaag in totaal gedaan is, over al je apparaten heen. */
+  today(now = Date.now()) {
+    return dayTotal(this.state.stats[dayKey(now, this.settings.dayCutoffHour)]);
   }
 
   remainingToday(now = Date.now()) {
@@ -348,7 +357,7 @@ class Store extends EventTarget {
     const next = schedule(card.srs, rating, now, this.settings.srs);
     card.srs = next;
 
-    const stats = this.today(now);
+    const stats = this.todayBucket(now);
     const xp = xpForAnswer(rating, wasNew);
     if (wasNew) stats.new++;
     stats.reviews++;
@@ -362,7 +371,7 @@ class Store extends EventTarget {
     this.state.log.push({ cardId, ts: now, rating, interval: next.interval, state: next.state });
     if (this.state.log.length > MAX_LOG) this.state.log.splice(0, this.state.log.length - MAX_LOG);
 
-    this.undoStack.push({ cardId, srs: before, wasNew, rating, xp, dayKey: dayKey(now, this.settings.dayCutoffHour) });
+    this.undoStack.push({ cardId, srs: before, wasNew, rating, xp, device: deviceId(), dayKey: dayKey(now, this.settings.dayCutoffHour) });
     if (this.undoStack.length > MAX_UNDO) this.undoStack.shift();
 
     this.changed({ type: 'answer', cardId });
@@ -379,7 +388,7 @@ class Store extends EventTarget {
     const card = this.state.cards[last.cardId];
     if (!card) return null;
     card.srs = last.srs;
-    const stats = this.state.stats[last.dayKey];
+    const stats = this.state.stats[last.dayKey]?.[last.device];
     if (stats) {
       stats.reviews = Math.max(0, stats.reviews - 1);
       stats.xp = Math.max(0, (stats.xp || 0) - (last.xp || 0));
@@ -476,8 +485,8 @@ class Store extends EventTarget {
     for (let i = days - 1; i >= 0; i--) {
       const ts = now - i * 24 * 60 * MINUTE;
       const key = dayKey(ts, this.settings.dayCutoffHour);
-      const s = this.state.stats[key];
-      out.push({ key, date: new Date(ts), reviews: s?.reviews || 0, new: s?.new || 0 });
+      const s = dayTotal(this.state.stats[key]);
+      out.push({ key, date: new Date(ts), reviews: s.reviews, new: s.new });
     }
     return out;
   }

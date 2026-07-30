@@ -53,7 +53,7 @@ export function syncPanel(params = {}) {
     const key = el('input', { class: 'input', type: 'text', placeholder: 'anon key (publiek)', autocapitalize: 'off', autocorrect: 'off' });
 
     panel.append(
-      el('p', { class: 'small muted', text: 'Koppel je Supabase-project om decks en voortgang tussen je telefoon en pc gelijk te houden. Draai eerst supabase/schema.sql in de SQL-editor van je project.' }),
+      el('p', { class: 'small muted', text: 'Koppel je Supabase-project om decks en voortgang tussen je telefoon en pc gelijk te houden. Draai eerst supabase/schema.sql in de SQL-editor van je project. Vul je deze gegevens in config.js in, dan hoef je op een nieuw apparaat alleen nog in te loggen.' }),
       el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Project-URL' }), url]),
       el('label', { class: 'field' }, [
         el('span', { class: 'label', text: 'Anon key' }),
@@ -109,12 +109,14 @@ export function syncPanel(params = {}) {
         el('button', { class: 'btn btn-primary grow', text: 'Inloggen', onclick: () => run('in') }),
         el('button', { class: 'btn btn-secondary', text: 'Account aanmaken', onclick: () => run('up') }),
       ]),
-      el('button', {
-        class: 'btn btn-secondary btn-sm',
-        style: 'margin-top:var(--space-3)',
-        text: 'Ander project koppelen',
-        onclick: () => { sync.clearConfig(); render(); },
-      }),
+      sync.configSource() === 'local'
+        ? el('button', {
+            class: 'btn btn-secondary btn-sm',
+            style: 'margin-top:var(--space-3)',
+            text: 'Ander project koppelen',
+            onclick: () => { sync.clearConfig(); render(); },
+          })
+        : null,
       status
     );
   }
@@ -159,23 +161,25 @@ export function syncPanel(params = {}) {
           },
         }),
       ]),
-      el('button', {
-        class: 'btn btn-secondary btn-sm',
-        style: 'margin-top:var(--space-3)',
-        text: 'Koppeling delen met ander apparaat',
-        onclick: async () => {
-          const token = await encodeShare(sync.getConfig());
-          const url = `${location.origin}${location.pathname}#/sync/${token}`;
-          if (navigator.share) {
-            try {
-              await navigator.share({ title: 'Kaartjes koppelen', url });
-              return;
-            } catch { /* geannuleerd */ }
-          }
-          toast((await copyToClipboard(url)) ? 'Link gekopieerd — open hem op je andere apparaat' : 'Kopiëren lukte niet');
-        },
-      }),
-      el('p', { class: 'small muted', style: 'margin:var(--space-3) 0 0', text: 'Er wordt automatisch gesynchroniseerd bij het openen van de app en na elke leersessie.' }),
+      sync.configSource() === 'local'
+        ? el('button', {
+            class: 'btn btn-secondary btn-sm',
+            style: 'margin-top:var(--space-3)',
+            text: 'Koppeling delen met ander apparaat',
+            onclick: async () => {
+              const token = await encodeShare(sync.getConfig());
+              const url = `${location.origin}${location.pathname}#/sync/${token}`;
+              if (navigator.share) {
+                try {
+                  await navigator.share({ title: 'Kaartjes koppelen', url });
+                  return;
+                } catch { /* geannuleerd */ }
+              }
+              toast((await copyToClipboard(url)) ? 'Link gekopieerd — open hem op je andere apparaat' : 'Kopiëren lukte niet');
+            },
+          })
+        : null,
+      el('p', { class: 'small muted', style: 'margin:var(--space-3) 0 0', text: 'Er wordt automatisch gesynchroniseerd terwijl je bezig bent, bij het openen van de app en zodra je hem wegklikt. Op een ander apparaat log je gewoon in met ditzelfde account.' }),
       status
     );
   }

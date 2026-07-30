@@ -4,7 +4,7 @@ import { store } from './store.js';
 import { el, clear, toast } from './ui.js';
 import { icon } from './icons.js';
 import { totalXp, levelInfo, streak } from './gamify.js';
-import { syncQuietly, isSignedIn } from './sync.js';
+import { syncQuietly, scheduleSync, flushSync, isSignedIn } from './sync.js';
 import * as home from './views/home.js';
 import * as study from './views/study.js';
 import * as add from './views/add.js';
@@ -118,15 +118,27 @@ store.addEventListener('change', (e) => {
 });
 store.addEventListener('storage-error', (e) => toast(e.detail, 5000));
 store.addEventListener('change', (e) => {
-  // Na een merge van een ander apparaat de tellers verversen — maar niet
-  // midden in een leersessie, dan zou de kaart onder je handen verdwijnen.
-  if (e.detail?.type === 'sync' && current?.name !== 'study') refresh();
+  if (e.detail?.type === 'sync') {
+    // Na een merge van een ander apparaat de tellers verversen — maar niet
+    // midden in een leersessie, dan zou de kaart onder je handen verdwijnen.
+    if (current?.name !== 'study') refresh();
+    return;
+  }
+  scheduleSync();
 });
 
 window.addEventListener('hashchange', render);
-window.addEventListener('pagehide', () => store.save({ immediate: true }));
+window.addEventListener('pagehide', () => {
+  store.save({ immediate: true });
+  flushSync();
+});
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') store.save({ immediate: true });
+  if (document.visibilityState === 'hidden') {
+    store.save({ immediate: true });
+    flushSync();
+  } else if (isSignedIn()) {
+    syncQuietly(); // terug in de app: eerst kijken of het andere apparaat iets heeft
+  }
 });
 
 render();

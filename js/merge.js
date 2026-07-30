@@ -19,6 +19,7 @@
  */
 
 import { cardKey } from './parse.js';
+import { mergeDay } from './daystats.js';
 
 const norm = (text) => String(text || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
@@ -130,13 +131,7 @@ export function mergeStates(local, remote) {
   const stats = {};
   const days = new Set([...Object.keys(local.stats || {}), ...Object.keys(remote.stats || {})]);
   for (const day of days) {
-    const a = local.stats?.[day] || {};
-    const b = remote.stats?.[day] || {};
-    const merged = {};
-    for (const field of new Set([...Object.keys(a), ...Object.keys(b)])) {
-      merged[field] = Math.max(Number(a[field]) || 0, Number(b[field]) || 0);
-    }
-    stats[day] = merged;
+    stats[day] = mergeDay(local.stats?.[day], remote.stats?.[day]);
   }
 
   // ── instellingen ───────────────────────────────────────────────────────

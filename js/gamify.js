@@ -4,6 +4,7 @@
  */
 
 import { dayKey, DAY } from './srs.js';
+import { dayTotal } from './daystats.js';
 
 export const XP_PER_ANSWER = 2;
 export const XP_CORRECT_BONUS = 1;
@@ -15,7 +16,7 @@ export function xpForAnswer(rating, wasNew) {
 }
 
 export function totalXp(stats) {
-  return Object.values(stats).reduce((sum, day) => sum + (day.xp || 0), 0);
+  return Object.values(stats).reduce((sum, day) => sum + dayTotal(day).xp, 0);
 }
 
 export function levelInfo(xp) {
@@ -29,16 +30,18 @@ export function streak(stats, now = Date.now(), cutoffHour = 4) {
   let count = 0;
   for (let i = 0; i < 3650; i++) {
     const key = dayKey(now - i * DAY, cutoffHour);
-    const day = stats[key];
-    if (day?.reviews) count++;
+    const day = dayTotal(stats[key]);
+    if (day.reviews) count++;
     else if (i > 0) break; // vandaag nog niets gedaan telt niet als onderbreking
   }
   return count;
 }
 
+/** Score van een dag (of van een al opgeteld totaal). */
 export function accuracy(day) {
-  if (!day?.reviews) return null;
-  return Math.round(((day.reviews - (day.again || 0)) / day.reviews) * 100);
+  const total = dayTotal(day);
+  if (!total.reviews) return null;
+  return Math.round(((total.reviews - total.again) / total.reviews) * 100);
 }
 
 /** Percentage van een deck dat "onder de knie" is: rijp telt vol, jong half. */
@@ -59,8 +62,7 @@ export function calendar(stats, weeks = 5, now = Date.now(), cutoffHour = 4) {
   const out = [];
   for (let i = days - 1; i >= 0; i--) {
     const ts = now - i * DAY;
-    const day = stats[dayKey(ts, cutoffHour)];
-    const reviews = day?.reviews || 0;
+    const reviews = dayTotal(stats[dayKey(ts, cutoffHour)]).reviews;
     out.push({ ts, reviews, level: reviews === 0 ? 0 : reviews < 10 ? 1 : reviews < 30 ? 2 : 3 });
   }
   return out;
@@ -73,10 +75,10 @@ export function weekly(stats, now = Date.now(), cutoffHour = 4) {
   const out = [];
   for (let i = 6; i >= 0; i--) {
     const ts = now - i * DAY;
-    const day = stats[dayKey(ts, cutoffHour)];
+    const day = dayTotal(stats[dayKey(ts, cutoffHour)]);
     out.push({
       label: WEEKDAYS[new Date(ts).getDay()],
-      reviews: day?.reviews || 0,
+      reviews: day.reviews,
       accuracy: accuracy(day),
     });
   }
@@ -99,9 +101,9 @@ const BADGES = [
  * @returns {Array<{id, name, desc, unlocked}>}
  */
 export function badges({ stats, cards }, now = Date.now(), cutoffHour = 4) {
-  const days = Object.values(stats);
+  const days = Object.values(stats).map(dayTotal);
   const context = {
-    answered: days.reduce((n, d) => n + (d.reviews || 0), 0),
+    answered: days.reduce((n, d) => n + d.reviews, 0),
     streak: streak(stats, now, cutoffHour),
     sharpDay: days.some((d) => d.reviews >= 20 && accuracy(d) >= 90),
     mature: cards.filter((c) => c.srs.state === 'review' && c.srs.interval >= 21).length,

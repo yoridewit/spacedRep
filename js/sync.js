@@ -75,6 +75,13 @@ export function isConfigured() {
   return Boolean(getConfig());
 }
 
+/** 'baked' = uit config.js, 'local' = in deze browser ingevuld. */
+export function configSource() {
+  const stored = readJson(CONFIG_KEY);
+  if (stored?.url && stored?.anonKey) return 'local';
+  return getConfig() ? 'baked' : null;
+}
+
 export function isSignedIn() {
   return Boolean(getSession()?.refresh_token);
 }
@@ -284,6 +291,24 @@ async function runSync() {
     // Iemand anders was sneller: opnieuw ophalen en samenvoegen.
   }
   throw new SyncError('Een ander apparaat was steeds net eerder. Probeer het zo nog eens.');
+}
+
+let debounceTimer = null;
+
+/**
+ * Plant een sync in nadat het even stil is. Zo staat je werk ook op de server
+ * als je halverwege een set stopt, zonder na elk antwoord te versturen.
+ */
+export function scheduleSync(delay = 12_000) {
+  if (!isConfigured() || !isSignedIn()) return;
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => syncQuietly(), delay);
+}
+
+/** Nu meteen, bijvoorbeeld als de app naar de achtergrond gaat. */
+export function flushSync() {
+  clearTimeout(debounceTimer);
+  return syncQuietly();
 }
 
 /** Synchroniseert op de achtergrond; fouten worden alleen gelogd. */
