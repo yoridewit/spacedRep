@@ -65,7 +65,7 @@ Er is geen build-stap; de map is de website.
 Elke kaart heeft een status: `new` → `learning` → `review`, en `relearning` als
 je een geleerde kaart fout hebt.
 
-- **Weer fout** — kaart terug naar de eerste leerstap, ease −0.20, interval gehalveerd.
+- **Opnieuw** — je wist het antwoord niet; kaart terug naar de eerste leerstap, ease −0.20, interval gehalveerd.
 - **Moeilijk** — interval × 1,2, ease −0.15.
 - **Goed** — interval × ease (start 2,5).
 - **Makkelijk** — interval × ease × 1,3, ease +0.15.

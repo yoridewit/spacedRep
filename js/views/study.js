@@ -7,7 +7,7 @@ import { icon } from '../icons.js';
 import { setChrome, navigate } from '../app.js';
 
 const GRADES = [
-  { rating: RATING.AGAIN, label: 'Weer fout' },
+  { rating: RATING.AGAIN, label: 'Opnieuw' },
   { rating: RATING.HARD, label: 'Moeilijk' },
   { rating: RATING.GOOD, label: 'Goed' },
   { rating: RATING.EASY, label: 'Makkelijk' },
