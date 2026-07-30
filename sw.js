@@ -17,6 +17,7 @@ const SHELL = [
   'js/icons.js',
   'js/gamify.js',
   'js/merge.js',
+  'js/keycheck.js',
   'js/sync.js',
   'js/views/home.js',
   'js/views/study.js',

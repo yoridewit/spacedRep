@@ -107,11 +107,38 @@ puur lokale historie.
 
 ## Publiceren op GitHub Pages
 
-Er is geen build-stap; de map is de website.
+Er is geen build-stap; de map *is* de website. Twee manieren:
 
-1. Push naar GitHub.
-2. **Settings → Pages → Source: Deploy from a branch**, kies je branch en `/root`.
-3. Open `https://<gebruiker>.github.io/<repo>/` op je telefoon.
+**Zonder Actions** — Settings → Pages → *Deploy from a branch*, kies je branch en
+`/root`. Je vult `config.js` dan zelf in (of je laat hem leeg en stelt sync in de
+app in).
+
+**Met Actions** (aanbevolen als je je Supabase-gegevens niet in de repo wilt) —
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) draait de tests,
+schrijft `config.js` uit repository-instellingen en rolt uit:
+
+1. Settings → Pages → Source: **GitHub Actions**.
+2. Settings → Secrets and variables → Actions:
+   - *Variables* → `SUPABASE_URL` = `https://<project-id>.supabase.co`
+   - *Secrets* → `SUPABASE_PUBLISHABLE_KEY` = je publiceerbare (anon) sleutel
+3. Push naar `main`.
+
+### Wat wel en niet geheim kan blijven
+
+Kaartjes is een statische app: alles wat de browser nodig heeft, kan de bezoeker
+lezen. Een GitHub-secret houdt een waarde uit je repo en uit je git-geschiedenis,
+maar zodra hij in `config.js` staat is hij onderdeel van de pagina. Dat is geen
+probleem, want:
+
+- de **publiceerbare (anon) sleutel** is daar ook voor bedoeld — hij zegt alleen
+  *welk* project je bedoelt. Wat ermee mag, bepaalt row level security, en die
+  laat iedereen alleen bij zijn eigen rij;
+- de **geheime sleutel** (`sb_secret_…` of een JWT met `service_role`) omzeilt RLS
+  volledig en hoort dus alleen op een server. Zet je hem toch in de app of in de
+  workflow, dan weigeren allebei hem (`js/keycheck.js`).
+
+Heb je die geheime sleutel ooit ergens geplakt waar hij niet hoort: draai hem om
+via Project Settings → API keys.
 
 ## Hoe de planning werkt
 
@@ -143,12 +170,14 @@ js/markup.js          veilige mini-markdown en cloze-weergave
 js/gamify.js          streak, XP, niveaus, badges
 js/daystats.js        dagtellers per apparaat
 js/device.js          id van dit apparaat (blijft lokaal)
+js/keycheck.js        weigert geheime Supabase-sleutels
 js/merge.js           samenvoegen van twee apparaten
 js/sync.js            Supabase-client (auth + REST via fetch)
 js/views/*.js         schermen
 sw.js                 service worker voor offline gebruik
 decks/                optionele bibliotheek die naast de app staat
 tools/make-icons.py   genereert de PNG-iconen
+tools/write-config.mjs schrijft config.js bij het uitrollen
 supabase/schema.sql   tabel + RLS voor synchronisatie
 tests/run.js          tests voor planner, parser, opmaak, merge en sync
 ```
@@ -156,7 +185,7 @@ tests/run.js          tests voor planner, parser, opmaak, merge en sync
 Geen dependencies, geen build-stap: gewoon ES-modules die de browser zelf laadt.
 
 ```bash
-node tests/run.js        # 55 tests
+node tests/run.js        # 58 tests
 python3 tools/make-icons.py
 ```
 

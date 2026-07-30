@@ -10,6 +10,7 @@ import { renderMarkup, renderCloze, cardSummary } from '../js/markup.js';
 import { levelInfo, streak, mastery, badges, xpForAnswer } from '../js/gamify.js';
 import { mergeStates, contentKey } from '../js/merge.js';
 import { dayTotal, mergeDay, normalizeDay } from '../js/daystats.js';
+import { looksSecret } from '../js/keycheck.js';
 
 let passed = 0;
 const failures = [];
@@ -427,6 +428,24 @@ test('samenvoegen is idempotent', () => {
 });
 
 
+// ── sleutels ─────────────────────────────────────────────────────────────
+
+const jwt = (payload) => {
+  const part = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
+  return `${part({ alg: 'HS256' })}.${part(payload)}.handtekening`;
+};
+
+test('geheime sleutels worden herkend', () => {
+  assert(looksSecret('sb_secret_srM6drdu2Xgpa5uZ'), 'sb_secret-prefix');
+  assert(looksSecret(jwt({ role: 'service_role', iss: 'supabase' })), 'service_role-JWT');
+});
+
+test('publiceerbare sleutels komen er gewoon door', () => {
+  assert(!looksSecret('sb_publishable_abc123def456ghi789'), 'sb_publishable-prefix');
+  assert(!looksSecret(jwt({ role: 'anon', iss: 'supabase' })), 'anon-JWT');
+  assert(!looksSecret(''), 'leeg');
+});
+
 // ── het sync-protocol (met een nagebootste server) ───────────────────────
 
 globalThis.localStorage = {
@@ -570,6 +589,18 @@ await asyncTest('een verlopen token wordt automatisch vernieuwd', async () => {
     await sync.syncNow();
   });
   assert(server.refreshed, 'refresh-token gebruikt');
+});
+
+await asyncTest('een geheime sleutel wordt geweigerd bij het instellen', async () => {
+  localStorage.clear();
+  let message = '';
+  try {
+    sync.setConfig({ url: 'https://project.supabase.co', anonKey: 'sb_secret_srM6drdu2Xgpa5uZ_l65QQ' });
+  } catch (err) {
+    message = err.message;
+  }
+  assert(message.includes('geheime sleutel'), `verwachtte een waarschuwing, kreeg: ${message}`);
+  eq(sync.isConfigured(), false, 'en er wordt niets opgeslagen');
 });
 
 await asyncTest('zonder configuratie of sessie gebeurt er niets', async () => {

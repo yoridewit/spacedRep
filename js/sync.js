@@ -12,6 +12,7 @@
  */
 
 import { store } from './store.js';
+import { looksSecret, SECRET_KEY_WARNING } from './keycheck.js';
 
 const CONFIG_KEY = 'kaartjes.supabase.v1';
 const SESSION_KEY = 'kaartjes.session.v1';
@@ -49,7 +50,8 @@ export function setConfig({ url, anonKey }) {
   const clean = String(url || '').trim().replace(/\/+$/, '');
   const key = String(anonKey || '').trim();
   if (!/^https:\/\/.+/.test(clean)) throw new SyncError('De project-URL moet met https:// beginnen.');
-  if (key.length < 20) throw new SyncError('Die anon key ziet er niet compleet uit.');
+  if (key.length < 20) throw new SyncError('Die sleutel ziet er niet compleet uit.');
+  if (looksSecret(key)) throw new SyncError(SECRET_KEY_WARNING);
   writeJson(CONFIG_KEY, { url: clean, anonKey: key });
   return getConfig();
 }
