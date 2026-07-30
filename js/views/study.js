@@ -5,6 +5,7 @@ import { badges, unlockedIds, totalXp, streak } from '../gamify.js';
 import { el, clear, toast } from '../ui.js';
 import { icon } from '../icons.js';
 import { setChrome, navigate } from '../app.js';
+import { syncQuietly } from '../sync.js';
 
 const GRADES = [
   { rating: RATING.AGAIN, label: 'Opnieuw' },
@@ -141,6 +142,7 @@ export function mount(root, params = {}) {
   function finish() {
     updateChrome();
     stage.dataset.state = 'done';
+    if (session.answered) syncQuietly();
 
     const accuracyPct = session.answered ? Math.round((session.correct / session.answered) * 100) : 0;
     const gainedXp = Math.max(0, totalXp(store.stats) - session.xpStart);

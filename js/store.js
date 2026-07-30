@@ -6,6 +6,7 @@
 import { DEFAULT_CONFIG, newSrsState, schedule, dayKey, endOfDay, MINUTE } from './srs.js';
 import { cardKey } from './parse.js';
 import { xpForAnswer } from './gamify.js';
+import { mergeStates, contentKey, emptyTombstones } from './merge.js';
 
 const STORAGE_KEY = 'spacedrep.state.v1';
 const SCHEMA_VERSION = 1;
@@ -33,6 +34,7 @@ function emptyState() {
     cards: {},
     settings: { ...DEFAULT_SETTINGS, srs: { ...DEFAULT_CONFIG } },
     stats: {},
+    tombstones: emptyTombstones(),
     log: [],
   };
 }
@@ -66,6 +68,7 @@ class Store extends EventTarget {
       decks: data.decks || {},
       cards: data.cards || {},
       stats: data.stats || {},
+      tombstones: { ...emptyTombstones(), ...(data.tombstones || {}) },
       log: Array.isArray(data.log) ? data.log : [],
     };
     for (const card of Object.values(state.cards)) {
@@ -105,7 +108,12 @@ class Store extends EventTarget {
   }
 
   updateSettings(patch) {
-    this.state.settings = { ...this.state.settings, ...patch, srs: { ...this.state.settings.srs, ...(patch.srs || {}) } };
+    this.state.settings = {
+      ...this.state.settings,
+      ...patch,
+      srs: { ...this.state.settings.srs, ...(patch.srs || {}) },
+      settingsUpdatedAt: Date.now(),
+    };
     this.changed({ type: 'settings' });
   }
 
@@ -145,6 +153,8 @@ class Store extends EventTarget {
   }
 
   deleteDeck(id) {
+    const deck = this.state.decks[id];
+    if (deck) this._bury('decks', deck.name.trim().toLowerCase().replace(/\s+/g, ' '));
     delete this.state.decks[id];
     for (const [cardId, card] of Object.entries(this.state.cards)) {
       if (card.deckId === id) delete this.state.cards[cardId];
@@ -214,6 +224,8 @@ class Store extends EventTarget {
 
   deleteCard(id) {
     const card = this.state.cards[id];
+    const deck = card && this.state.decks[card.deckId];
+    if (card && deck) this._bury('cards', contentKey(card, deck.name));
     delete this.state.cards[id];
     this.undoStack = this.undoStack.filter((u) => u.cardId !== id);
     this.changed({ type: 'card-deleted', id, deckId: card?.deckId });
@@ -395,6 +407,45 @@ class Store extends EventTarget {
           ? { type: 'cloze', text: c.text, tags: c.tags, hint: c.hint || undefined }
           : { front: c.front, back: c.back, hint: c.hint || undefined, note: c.note || undefined, tags: c.tags }),
     };
+  }
+
+  // ---------- synchroniseren ----------
+
+  /** Onthoudt dat iets verwijderd is, zodat het na een merge niet terugkomt. */
+  _bury(kind, key) {
+    if (!this.state.tombstones) this.state.tombstones = emptyTombstones();
+    this.state.tombstones[kind][key] = Date.now();
+  }
+
+  /**
+   * De gegevens die gedeeld worden tussen apparaten. Het logboek blijft lokaal:
+   * dat is puur historie en zou de payload onnodig groot maken.
+   */
+  syncDoc() {
+    return {
+      decks: this.state.decks,
+      cards: this.state.cards,
+      stats: this.state.stats,
+      settings: this.state.settings,
+      tombstones: this.state.tombstones || emptyTombstones(),
+    };
+  }
+
+  /**
+   * Voegt een binnengehaalde stand samen met de lokale en neemt het resultaat over.
+   * @returns het overzicht van wat erbij kwam, voor de melding aan de gebruiker.
+   */
+  applyRemote(remoteDoc) {
+    const { state: merged, summary } = mergeStates(this.syncDoc(), remoteDoc);
+    this.state.decks = merged.decks;
+    this.state.cards = merged.cards;
+    this.state.stats = merged.stats;
+    this.state.settings = { ...merged.settings, srs: { ...DEFAULT_CONFIG, ...(merged.settings?.srs || {}) } };
+    this.state.tombstones = merged.tombstones;
+    this.undoStack = this.undoStack.filter((u) => this.state.cards[u.cardId]);
+    this.save({ immediate: true });
+    this.dispatchEvent(new CustomEvent('change', { detail: { type: 'sync' } }));
+    return summary;
   }
 
   exportBackup() {

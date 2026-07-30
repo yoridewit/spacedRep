@@ -1,6 +1,6 @@
 /* Service worker: app-schil offline beschikbaar houden. */
 
-const CACHE = 'spacedrep-v1';
+const CACHE = 'kaartjes-v2';
 const SHELL = [
   './',
   'index.html',
@@ -15,12 +15,15 @@ const SHELL = [
   'js/ui.js',
   'js/icons.js',
   'js/gamify.js',
+  'js/merge.js',
+  'js/sync.js',
   'js/views/home.js',
   'js/views/study.js',
   'js/views/add.js',
   'js/views/deck.js',
   'js/views/stats.js',
   'js/views/settings.js',
+  'js/views/sync-panel.js',
   'fonts/caprasimo-latin.woff2',
   'fonts/caprasimo-latin-ext.woff2',
   'fonts/figtree-latin.woff2',

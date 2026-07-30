@@ -4,6 +4,7 @@ import { store } from './store.js';
 import { el, clear, toast } from './ui.js';
 import { icon } from './icons.js';
 import { totalXp, levelInfo, streak } from './gamify.js';
+import { syncQuietly, isSignedIn } from './sync.js';
 import * as home from './views/home.js';
 import * as study from './views/study.js';
 import * as add from './views/add.js';
@@ -33,6 +34,7 @@ function parseRoute() {
   if (!parts.length) return { name: 'home', params };
   const [name, ...rest] = parts;
   if (name === 'share') return { name: 'add', params: { ...params, share: rest.join('/') } };
+  if (name === 'sync') return { name: 'settings', params: { ...params, sync: rest.join('/') } };
   if (!ROUTES[name]) return { name: 'home', params };
   return { name, params: { ...params, id: rest[0] ? decodeURIComponent(rest[0]) : undefined } };
 }
@@ -115,6 +117,11 @@ store.addEventListener('change', (e) => {
   if (['settings', 'restore', 'wipe'].includes(e.detail?.type)) applyTheme();
 });
 store.addEventListener('storage-error', (e) => toast(e.detail, 5000));
+store.addEventListener('change', (e) => {
+  // Na een merge van een ander apparaat de tellers verversen — maar niet
+  // midden in een leersessie, dan zou de kaart onder je handen verdwijnen.
+  if (e.detail?.type === 'sync' && current?.name !== 'study') refresh();
+});
 
 window.addEventListener('hashchange', render);
 window.addEventListener('pagehide', () => store.save({ immediate: true }));
@@ -123,6 +130,9 @@ document.addEventListener('visibilitychange', () => {
 });
 
 render();
+
+if (isSignedIn()) syncQuietly();
+window.addEventListener('online', () => syncQuietly());
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {

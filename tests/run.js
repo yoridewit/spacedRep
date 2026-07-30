@@ -8,6 +8,7 @@ import { newSrsState, schedule, RATING, DEFAULT_CONFIG, DAY, MINUTE, dayKey, for
 import { parseImport, cardKey, clozeNumbers, ParseError } from '../js/parse.js';
 import { renderMarkup, renderCloze, cardSummary } from '../js/markup.js';
 import { levelInfo, streak, mastery, badges, xpForAnswer } from '../js/gamify.js';
+import { mergeStates, contentKey } from '../js/merge.js';
 
 let passed = 0;
 const failures = [];
@@ -278,6 +279,280 @@ test('badges gaan open op hun drempel', () => {
   const byId = Object.fromEntries(list.map((b) => [b.id, b.unlocked]));
   eq(byId.start, true);
   eq(byId.honderd, false);
+});
+
+
+// ── samenvoegen tussen apparaten ─────────────────────────────────────────
+
+const deckA = { id: 'd_1', name: 'Biologie', description: '', created: NOW - 10 * DAY };
+const deckAOther = { id: 'd_9', name: 'biologie ', description: 'kopie', created: NOW - 9 * DAY };
+
+function card(id, deckId, front, { lastReview = null, interval = 0, state = 'new' } = {}) {
+  return {
+    id, deckId, type: 'basic', front, back: `${front}!`, text: '', clozeIndex: null,
+    hint: '', note: '', tags: [], created: NOW - 5 * DAY,
+    srs: { state, due: NOW, interval, ease: 2.5, step: 0, reps: 0, lapses: 0, lastReview },
+  };
+}
+
+const emptyDoc = () => ({ decks: {}, cards: {}, stats: {}, settings: {}, tombstones: { decks: {}, cards: {} } });
+
+test('merge zonder tegenhanger geeft de lokale stand terug', () => {
+  const local = { ...emptyDoc(), decks: { d_1: deckA } };
+  eq(mergeStates(local, null).state, local);
+});
+
+test('kaarten van beide kanten komen samen', () => {
+  const local = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_1: card('c_1', 'd_1', 'Wat is DNA?') } };
+  const remote = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_2: card('c_2', 'd_1', 'Wat is RNA?') } };
+  const { state, summary } = mergeStates(local, remote);
+  eq(Object.keys(state.cards).length, 2);
+  eq(summary.cardsAdded, 1);
+});
+
+test('hetzelfde deck onder een andere id wordt niet gedupliceerd', () => {
+  const local = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_1: card('c_1', 'd_1', 'Vraag 1') } };
+  const remote = { ...emptyDoc(), decks: { d_9: deckAOther }, cards: { c_2: card('c_2', 'd_9', 'Vraag 2') } };
+  const { state } = mergeStates(local, remote);
+  eq(Object.keys(state.decks).length, 1, 'één deck');
+  eq(Object.keys(state.cards).length, 2, 'beide kaarten, in hetzelfde deck');
+  for (const c of Object.values(state.cards)) eq(c.deckId, 'd_1');
+});
+
+test('dezelfde kaart: de laatst geoefende planning wint', () => {
+  const oud = card('c_1', 'd_1', 'Wat is DNA?', { lastReview: NOW - 3 * DAY, interval: 4, state: 'review' });
+  const nieuw = card('c_2', 'd_1', 'wat is  DNA? ', { lastReview: NOW - 1 * DAY, interval: 12, state: 'review' });
+  const local = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_1: oud } };
+  const remote = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_2: nieuw } };
+  const { state } = mergeStates(local, remote);
+  eq(Object.keys(state.cards).length, 1, 'geen dubbele kaart');
+  eq(Object.values(state.cards)[0].srs.interval, 12);
+});
+
+test('de oudere planning overschrijft de nieuwere niet', () => {
+  const nieuw = card('c_1', 'd_1', 'Wat is DNA?', { lastReview: NOW - 1 * DAY, interval: 12, state: 'review' });
+  const oud = card('c_2', 'd_1', 'Wat is DNA?', { lastReview: NOW - 3 * DAY, interval: 4, state: 'review' });
+  const { state } = mergeStates(
+    { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_1: nieuw } },
+    { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_2: oud } }
+  );
+  eq(Object.values(state.cards)[0].srs.interval, 12);
+});
+
+test('een verwijderde kaart komt niet terug', () => {
+  const weg = card('c_2', 'd_1', 'Weggegooid', { lastReview: NOW - 2 * DAY });
+  const local = {
+    ...emptyDoc(),
+    decks: { d_1: deckA },
+    tombstones: { decks: {}, cards: { [contentKey(weg, 'Biologie')]: NOW - 1000 } },
+  };
+  const remote = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_2: weg } };
+  eq(Object.keys(mergeStates(local, remote).state.cards).length, 0);
+});
+
+test('maar wel als je hem daarna opnieuw hebt geoefend', () => {
+  const terug = card('c_2', 'd_1', 'Weggegooid', { lastReview: NOW });
+  const local = {
+    ...emptyDoc(),
+    decks: { d_1: deckA },
+    tombstones: { decks: {}, cards: { [contentKey(terug, 'Biologie')]: NOW - 1000 } },
+  };
+  const remote = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_2: terug } };
+  eq(Object.keys(mergeStates(local, remote).state.cards).length, 1);
+});
+
+test('een verwijderd deck neemt zijn kaarten mee', () => {
+  const local = { ...emptyDoc(), tombstones: { decks: { biologie: NOW }, cards: {} } };
+  const remote = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_1: card('c_1', 'd_1', 'Vraag') } };
+  const { state } = mergeStates(local, remote);
+  eq(Object.keys(state.decks).length, 0);
+  eq(Object.keys(state.cards).length, 0);
+});
+
+test('dagstatistiek telt niet dubbel bij opnieuw synchroniseren', () => {
+  const day = dayKey(NOW, 4);
+  const local = { ...emptyDoc(), stats: { [day]: { reviews: 12, xp: 30, again: 2 } } };
+  const remote = { ...emptyDoc(), stats: { [day]: { reviews: 8, xp: 20, again: 3 } } };
+  const once = mergeStates(local, remote).state;
+  eq(once.stats[day], { reviews: 12, xp: 30, again: 3 });
+  const twice = mergeStates(once, remote).state;
+  eq(twice.stats[day], once.stats[day], 'tweede keer verandert niets meer');
+});
+
+test('de nieuwste instellingen winnen, het thema blijft van het apparaat', () => {
+  const local = { ...emptyDoc(), settings: { newPerDay: 20, theme: 'dark', settingsUpdatedAt: 100 } };
+  const remote = { ...emptyDoc(), settings: { newPerDay: 40, theme: 'light', settingsUpdatedAt: 200 } };
+  const { state } = mergeStates(local, remote);
+  eq(state.settings.newPerDay, 40);
+  eq(state.settings.theme, 'dark');
+});
+
+test('samenvoegen is idempotent', () => {
+  const local = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_1: card('c_1', 'd_1', 'Vraag 1') } };
+  const remote = { ...emptyDoc(), decks: { d_9: deckAOther }, cards: { c_2: card('c_2', 'd_9', 'Vraag 2') } };
+  const once = mergeStates(local, remote).state;
+  const twice = mergeStates(once, remote).state;
+  eq(Object.keys(twice.cards).length, Object.keys(once.cards).length);
+  eq(Object.keys(twice.decks).length, 1);
+});
+
+
+// ── het sync-protocol (met een nagebootste server) ───────────────────────
+
+globalThis.localStorage = {
+  _data: new Map(),
+  getItem(key) { return this._data.has(key) ? this._data.get(key) : null; },
+  setItem(key, value) { this._data.set(key, String(value)); },
+  removeItem(key) { this._data.delete(key); },
+  clear() { this._data.clear(); },
+};
+
+const { store } = await import('../js/store.js');
+const sync = await import('../js/sync.js');
+
+/** Bootst de Supabase-endpoints na en houdt bij wat er langskomt. */
+function fakeServer({ row = null, failFirstPatch = false, expireToken = false } = {}) {
+  const calls = [];
+  let patches = 0;
+  let refreshed = false;
+
+  globalThis.fetch = async (url, options = {}) => {
+    const method = options.method || 'GET';
+    const body = options.body ? JSON.parse(options.body) : null;
+    calls.push({ url: String(url), method, body });
+    const reply = (status, data) => ({
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => JSON.stringify(data),
+    });
+
+    if (String(url).includes('grant_type=password')) {
+      return reply(200, {
+        access_token: 'token-1', refresh_token: 'refresh-1',
+        expires_in: expireToken ? -10 : 3600,
+        user: { id: 'user-1', email: body.email },
+      });
+    }
+    if (String(url).includes('grant_type=refresh_token')) {
+      refreshed = true;
+      return reply(200, {
+        access_token: 'token-2', refresh_token: 'refresh-1', expires_in: 3600,
+        user: { id: 'user-1', email: 'ik@voorbeeld.nl' },
+      });
+    }
+    if (String(url).includes('/rest/v1/sync_state')) {
+      if (method === 'GET') return reply(200, row ? [row] : []);
+      if (method === 'POST') {
+        row = { doc: body.doc, revision: 1 };
+        return reply(201, [row]);
+      }
+      if (method === 'PATCH') {
+        patches++;
+        if (failFirstPatch && patches === 1) {
+          row = { doc: row.doc, revision: row.revision + 1 }; // ander apparaat was sneller
+          return reply(200, []);
+        }
+        row = { doc: body.doc, revision: body.revision };
+        return reply(200, [row]);
+      }
+    }
+    return reply(404, { message: 'onbekend endpoint' });
+  };
+
+  return { calls, get row() { return row; }, get refreshed() { return refreshed; }, get patches() { return patches; } };
+}
+
+async function withFreshStore(fn) {
+  localStorage.clear();
+  store.wipe();
+  sync.setConfig({ url: 'https://project.supabase.co', anonKey: 'x'.repeat(40) });
+  await sync.signIn('ik@voorbeeld.nl', 'geheim123');
+  return fn();
+}
+
+async function asyncTest(name, fn) {
+  try {
+    await fn();
+    passed++;
+  } catch (err) {
+    failures.push(`${name}: ${err.message}`);
+  }
+}
+
+await asyncTest('eerste sync maakt de rij aan met de lokale stand', async () => {
+  const server = fakeServer({});
+  await withFreshStore(async () => {
+    const deck = store.createDeck('Biologie');
+    store.addCards(deck.id, [{ type: 'basic', front: 'Wat is DNA?', back: 'Erfelijk materiaal' }]);
+    await sync.syncNow();
+  });
+  const inserts = server.calls.filter((c) => c.method === 'POST' && c.url.includes('/rest/'));
+  eq(inserts.length, 1, 'precies één insert');
+  eq(Object.keys(server.row.doc.cards).length, 1);
+  eq(server.row.revision, 1);
+  assert(sync.meta().lastSync > 0, 'tijdstip onthouden');
+});
+
+await asyncTest('kaarten van het andere apparaat komen binnen', async () => {
+  const remoteCard = card('c_ver', 'd_ver', 'Van de pc');
+  const server = fakeServer({
+    row: {
+      revision: 7,
+      doc: {
+        decks: { d_ver: { id: 'd_ver', name: 'Biologie', description: '', created: NOW - DAY } },
+        cards: { c_ver: remoteCard },
+        stats: {}, settings: {}, tombstones: { decks: {}, cards: {} },
+      },
+    },
+  });
+  await withFreshStore(async () => {
+    const deck = store.createDeck('Biologie');
+    store.addCards(deck.id, [{ type: 'basic', front: 'Van de telefoon', back: 'B' }]);
+    const summary = await sync.syncNow();
+    eq(summary.cardsAdded, 1);
+  });
+  eq(store.allCards().length, 2, 'beide kaarten staan nu lokaal');
+  eq(store.listDecks().length, 1, 'in hetzelfde deck');
+  eq(server.row.revision, 8, 'revisie opgehoogd');
+  eq(Object.keys(server.row.doc.cards).length, 2, 'en teruggezet naar de server');
+});
+
+await asyncTest('bij een revisieconflict wordt opnieuw opgehaald en samengevoegd', async () => {
+  const server = fakeServer({
+    row: { revision: 3, doc: { decks: {}, cards: {}, stats: {}, settings: {}, tombstones: { decks: {}, cards: {} } } },
+    failFirstPatch: true,
+  });
+  await withFreshStore(async () => {
+    const deck = store.createDeck('Biologie');
+    store.addCards(deck.id, [{ type: 'basic', front: 'Vraag', back: 'Antwoord' }]);
+    await sync.syncNow();
+  });
+  const pulls = server.calls.filter((c) => c.method === 'GET').length;
+  eq(server.patches, 2, 'tweede poging gedaan');
+  eq(pulls, 2, 'en daarvoor opnieuw opgehaald');
+  eq(Object.keys(server.row.doc.cards).length, 1, 'niets kwijtgeraakt');
+});
+
+await asyncTest('een verlopen token wordt automatisch vernieuwd', async () => {
+  const server = fakeServer({ expireToken: true });
+  await withFreshStore(async () => {
+    store.createDeck('Biologie');
+    await sync.syncNow();
+  });
+  assert(server.refreshed, 'refresh-token gebruikt');
+});
+
+await asyncTest('zonder configuratie of sessie gebeurt er niets', async () => {
+  localStorage.clear();
+  globalThis.fetch = async () => { throw new Error('had niet aangeroepen mogen worden'); };
+  eq(await sync.syncQuietly(), null);
+  let raised = false;
+  try {
+    await sync.syncNow();
+  } catch (err) {
+    raised = err instanceof sync.SyncError;
+  }
+  assert(raised, 'verwachtte een SyncError');
 });
 
 // ── uitkomst ─────────────────────────────────────────────────────────────

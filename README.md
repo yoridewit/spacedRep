@@ -8,7 +8,9 @@ iPhone te draaien én op je pc te gebruiken om kaarten toe te voegen.
   roepen — er is dus geen API-sleutel en geen account nodig.
 - **Anki-achtig leren.** SM-2-planner met leerstappen, ease-factor, herleren na
   fouten en daglimieten voor nieuwe kaarten en herhalingen.
-- **Werkt offline.** Alles staat in je eigen browser; geen server, geen tracking.
+- **Werkt offline.** Alles staat in je eigen browser; geen server nodig.
+- **Synchroniseren tussen apparaten** (optioneel) via je eigen Supabase-project,
+  met een echte merge in plaats van "laatste wint".
 - **Voortgang die motiveert.** Streak, XP, niveaus, badges en een oefenkalender.
 
 ## Snel starten
@@ -40,7 +42,10 @@ schermvullend op, werkt hij offline en staat hij tussen je andere apps.
 
 Dezelfde URL werkt op je pc; het scherm wordt breder en je kunt met het
 toetsenbord leren (spatie = omdraaien, 1-4 = beoordelen, U = ongedaan maken).
-Je voortgang staat per apparaat apart — kaarten toevoegen op je pc doe je zo:
+
+Het makkelijkst is [synchroniseren via Supabase](#synchroniseren-via-supabase):
+dan lopen kaarten én voortgang vanzelf gelijk. Zonder sync staat alles per
+apparaat apart en zet je kaarten zo over:
 
 | Manier | Hoe | Wanneer handig |
 | --- | --- | --- |
@@ -51,6 +56,48 @@ Je voortgang staat per apparaat apart — kaarten toevoegen op je pc doe je zo:
 
 Een deck opnieuw importeren is veilig: bestaande kaarten worden overgeslagen en
 je voortgang blijft staan.
+
+## Synchroniseren via Supabase
+
+Optioneel, maar aan te raden als je op twee apparaten werkt. De app praat
+rechtstreeks met de Auth- en REST-endpoints van je project — geen SDK, geen
+build-stap, en offline werkt gewoon door.
+
+1. Draai [`supabase/schema.sql`](supabase/schema.sql) in de SQL-editor van je
+   project. Dat maakt de tabel `sync_state` met row level security: elke
+   gebruiker kan alleen bij zijn eigen rij.
+2. Open in de app **Instellingen → Synchronisatie** en vul je project-URL en
+   **anon key** in (Project Settings → API). Die sleutel is bedoeld om publiek
+   te zijn; RLS doet het echte werk.
+3. Maak een account aan met e-mail en wachtwoord en log in. Staat *Confirm
+   email* aan in je project, klik dan eenmalig op de bevestigingslink.
+4. Op je tweede apparaat: **Koppeling delen met ander apparaat** geeft je een
+   link met de projectgegevens erin, zodat je die sleutel niet hoeft over te
+   typen. Log daar in met hetzelfde account.
+
+Er wordt gesynchroniseerd bij het openen van de app, na elke leersessie, zodra
+je weer online komt, en met de knop **Nu synchroniseren**.
+
+### Hoe het samenvoegen werkt
+
+Er staat één rij per gebruiker met de hele stand als `jsonb` en een `revision`.
+Opslaan gebeurt alleen als die revision nog klopt; anders wordt er opnieuw
+opgehaald en samengevoegd. Twee apparaten kennen elkaars id's niet, dus er wordt
+op inhoud gematcht (`js/merge.js`):
+
+- decks op hun naam, kaarten op hun voorkant — dezelfde regel waarmee de import
+  dubbele kaarten herkent;
+- staat een kaart aan beide kanten, dan wint de planning van de kant waar hij
+  het **laatst geoefend** is;
+- verwijderde kaarten en decks blijven weg, tenzij je er op het andere apparaat
+  ná het verwijderen nog mee bezig bent geweest;
+- dagstatistiek neemt per dag de hoogste stand, zodat opnieuw synchroniseren
+  nooit dubbel telt. Oefen je op één dag op twéé apparaten, dan telt de app die
+  dag de hoogste van de twee in plaats van de som.
+
+Instellingen volgen de laatst gewijzigde kant; alleen het thema blijft een
+voorkeur per apparaat. Het antwoordlogboek wordt niet gesynchroniseerd — dat is
+puur lokale historie.
 
 ## Publiceren op GitHub Pages
 
@@ -87,22 +134,26 @@ js/store.js           opslag (localStorage), wachtrij en daglimieten
 js/parse.js           import-parser (JSON + platte tekst)
 js/markup.js          veilige mini-markdown en cloze-weergave
 js/gamify.js          streak, XP, niveaus, badges
+js/merge.js           samenvoegen van twee apparaten
+js/sync.js            Supabase-client (auth + REST via fetch)
 js/views/*.js         schermen
 sw.js                 service worker voor offline gebruik
 decks/                optionele bibliotheek die naast de app staat
 tools/make-icons.py   genereert de PNG-iconen
-tests/run.js          tests voor planner, parser en opmaak
+supabase/schema.sql   tabel + RLS voor synchronisatie
+tests/run.js          tests voor planner, parser, opmaak, merge en sync
 ```
 
 Geen dependencies, geen build-stap: gewoon ES-modules die de browser zelf laadt.
 
 ```bash
-node tests/run.js        # 35 tests
+node tests/run.js        # 51 tests
 python3 tools/make-icons.py
 ```
 
 ## Privacy
 
-Alles blijft lokaal in je browser: decks, kaarten, voortgang en statistiek. Er
-gaat niets naar een server, ook niet naar een AI — het omzetten van je lesstof
-doe je zelf, buiten de app om.
+Zonder synchronisatie blijft alles in je browser: decks, kaarten, voortgang en
+statistiek. Zet je sync aan, dan staat diezelfde stand in *jouw* Supabase-project,
+afgeschermd per account met row level security. Er gaat nooit iets naar een AI —
+het omzetten van je lesstof doe je zelf, buiten de app om.

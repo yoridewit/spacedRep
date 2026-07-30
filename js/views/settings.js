@@ -1,7 +1,9 @@
 import { store, DEFAULT_SETTINGS } from '../store.js';
+import { isSignedIn } from '../sync.js';
 import { DEFAULT_CONFIG } from '../srs.js';
 import { el, toast, confirmDialog, downloadJson, pickFile, plural } from '../ui.js';
 import { refresh } from '../app.js';
+import { syncPanel } from './sync-panel.js';
 
 function field(label, control, help) {
   return el('label', { class: 'field' }, [
@@ -17,7 +19,7 @@ function numberInput(value, { min = 0, max = 9999, step = 1 } = {}) {
   return input;
 }
 
-export function mount(root) {
+export function mount(root, params = {}) {
   const s = store.settings;
 
   const newPerDay = numberInput(s.newPerDay, { min: 0, max: 999 });
@@ -98,9 +100,12 @@ export function mount(root) {
       }),
     ]),
 
+    el('h2', { class: 'section-title', text: 'Synchroniseren' }),
+    syncPanel(params),
+
     el('h2', { class: 'section-title', text: 'Back-up' }),
     el('div', { class: 'panel' }, [
-      el('p', { class: 'small muted', text: `${plural(cardCount, 'kaart', 'kaarten')} in ${plural(deckCount, 'deck', 'decks')}. Alles staat alleen in deze browser — maak af en toe een back-up.` }),
+      el('p', { class: 'small muted', text: `${plural(cardCount, 'kaart', 'kaarten')} in ${plural(deckCount, 'deck', 'decks')}. ${isSignedIn() ? 'Je synchroniseert, maar een los bestand is nooit weg.' : 'Alles staat alleen in deze browser — maak af en toe een back-up.'}` }),
       el('div', { class: 'row' }, [
         el('button', {
           class: 'btn btn-secondary btn-sm',
@@ -151,7 +156,7 @@ export function mount(root) {
 
     el('h2', { class: 'section-title', text: 'Over' }),
     el('div', { class: 'panel' }, [
-      el('p', { class: 'small muted', text: 'Kaartjes werkt offline en slaat niets op een server op. Op je iPhone: deel-knop in Safari → "Zet op beginscherm" voor een echte app-ervaring.' }),
+      el('p', { class: 'small muted', text: `Kaartjes werkt offline. ${isSignedIn() ? 'Je gegevens staan in je eigen Supabase-project, verder nergens.' : 'Er gaat niets naar een server.'} Op je iPhone: deel-knop in Safari → "Zet op beginscherm" voor een echte app-ervaring.` }),
       el('p', { class: 'small muted', text: `Standaard: ${DEFAULT_SETTINGS.newPerDay} nieuwe kaarten en ${DEFAULT_SETTINGS.maxReviewsPerDay} herhalingen per dag.` }),
     ])
   );
