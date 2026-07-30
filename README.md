@@ -122,29 +122,21 @@ importeren de default branch van de repo over; wijzig je de default branch later
 dan verandert die instelling *niet* mee. Pushes naar andere branches worden
 preview-deploys met een eigen URL — handig, maar niet je productie-URL.
 
-## Publiceren op GitHub Pages
+## Publiceren elders
 
-Er is geen build-stap; de map *is* de website. Twee manieren:
+Er is geen build-stap, dus elke statische host werkt. Op GitHub Pages:
+Settings → Pages → *Deploy from a branch*, kies je branch en `/root`. Vul dan
+`config.js` zelf in, of laat hem leeg en stel synchroniseren in de app in —
+`tools/write-config.mjs` draait daar immers niet.
 
-**Zonder Actions** — Settings → Pages → *Deploy from a branch*, kies je branch en
-`/root`. Je vult `config.js` dan zelf in (of je laat hem leeg en stelt sync in de
-app in).
-
-**Met Actions** (aanbevolen als je je Supabase-gegevens niet in de repo wilt) —
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) draait de tests,
-schrijft `config.js` uit repository-instellingen en rolt uit:
-
-1. Settings → Pages → Source: **GitHub Actions**.
-2. Settings → Secrets and variables → Actions:
-   - *Variables* → `SUPABASE_URL` = `https://<project-id>.supabase.co`
-   - *Secrets* → `SUPABASE_PUBLISHABLE_KEY` = je publiceerbare (anon) sleutel
-3. Push naar `main`.
+In [`.github/workflows/ci.yml`](.github/workflows/ci.yml) draaien alleen de
+tests; die workflow raakt de site niet aan.
 
 ### Wat wel en niet geheim kan blijven
 
 Kaartjes is een statische app: alles wat de browser nodig heeft, kan de bezoeker
-lezen. Een GitHub-secret houdt een waarde uit je repo en uit je git-geschiedenis,
-maar zodra hij in `config.js` staat is hij onderdeel van de pagina. Dat is geen
+lezen. Een secret houdt een waarde uit je repo en uit je git-geschiedenis, maar
+zodra hij in `config.js` staat is hij onderdeel van de pagina. Dat is geen
 probleem, want:
 
 - de **publiceerbare (anon) sleutel** is daar ook voor bedoeld — hij zegt alleen
@@ -152,7 +144,7 @@ probleem, want:
   laat iedereen alleen bij zijn eigen rij;
 - de **geheime sleutel** (`sb_secret_…` of een JWT met `service_role`) omzeilt RLS
   volledig en hoort dus alleen op een server. Zet je hem toch in de app of in de
-  workflow, dan weigeren allebei hem (`js/keycheck.js`).
+  uitrol, dan weigeren allebei hem (`js/keycheck.js`).
 
 Heb je die geheime sleutel ooit ergens geplakt waar hij niet hoort: draai hem om
 via Project Settings → API keys.
