@@ -105,6 +105,23 @@ Instellingen volgen de laatst gewijzigde kant; alleen het thema blijft een
 voorkeur per apparaat. Het antwoordlogboek wordt niet gesynchroniseerd — dat is
 puur lokale historie.
 
+## Publiceren op Vercel
+
+De repo importeren is genoeg; er is geen framework en geen build-stap nodig.
+[`vercel.json`](vercel.json) regelt de rest:
+
+- **Build Command** `node tools/write-config.mjs` schrijft `config.js` uit de
+  omgevingsvariabelen van je Vercel-project. Zet onder Settings → Environment
+  Variables `SUPABASE_URL` en `SUPABASE_PUBLISHABLE_KEY`; laat je ze weg, dan
+  komt er een lege `config.js` en stel je sync in de app zelf in.
+- `sw.js`, `index.html` en `config.js` krijgen `must-revalidate`, lettertypen een
+  jaar cache. Zo zie je een nieuwe versie meteen.
+
+De **Production Branch** staat onder Settings → Git. Vercel neemt daar bij het
+importeren de default branch van de repo over; wijzig je de default branch later,
+dan verandert die instelling *niet* mee. Pushes naar andere branches worden
+preview-deploys met een eigen URL — handig, maar niet je productie-URL.
+
 ## Publiceren op GitHub Pages
 
 Er is geen build-stap; de map *is* de website. Twee manieren:
@@ -161,6 +178,7 @@ zodat laat doorleren nog bij gisteren telt. Alles is instelbaar onder
 ```
 index.html            de hele app-schil
 config.js             je Supabase-gegevens (optioneel)
+vercel.json           build-commando en cache-headers voor Vercel
 css/app.css           design system ("Organic": Caprasimo + Figtree)
 js/app.js             router en kop
 js/srs.js             SM-2-planner

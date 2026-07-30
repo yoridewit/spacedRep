@@ -1,6 +1,17 @@
-/* Service worker: app-schil offline beschikbaar houden. */
+/* Service worker: app-schil offline beschikbaar houden.
+ *
+ * Strategie:
+ *   - navigatie, JS, CSS en JSON: eerst het netwerk, cache als terugval. Zo zie
+ *     je een nieuwe versie meteen na het uitrollen, in plaats van pas nadat de
+ *     cache toevallig ververst is;
+ *   - lettertypen en iconen: eerst de cache. Die veranderen zelden en zijn het
+ *     zwaarst.
+ *
+ * Bij het installeren wordt de hele schil alvast opgehaald, zodat de app ook
+ * zonder verbinding start.
+ */
 
-const CACHE = 'kaartjes-v2';
+const CACHE = 'kaartjes-v3';
 const SHELL = [
   './',
   'index.html',
@@ -19,6 +30,8 @@ const SHELL = [
   'js/merge.js',
   'js/keycheck.js',
   'js/sync.js',
+  'js/daystats.js',
+  'js/device.js',
   'js/views/home.js',
   'js/views/study.js',
   'js/views/add.js',
@@ -52,6 +65,29 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE);
+  try {
+    const response = await fetch(request);
+    if (response.ok) cache.put(request, response.clone());
+    return response;
+  } catch (err) {
+    const cached = await cache.match(request)
+      ?? (request.mode === 'navigate' ? await cache.match('index.html') : undefined);
+    if (cached) return cached;
+    throw err;
+  }
+}
+
+async function cacheFirst(request) {
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const response = await fetch(request);
+  if (response.ok) cache.put(request, response.clone());
+  return response;
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -59,40 +95,6 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== location.origin) return;
 
-  // Decks en de Supabase-instellingen mogen best vers zijn; val terug op de cache offline.
-  if (url.pathname.includes('/decks/') || url.pathname.endsWith('/config.js')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  // Navigatie: altijd de app-schil, zodat #-routes offline werken.
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      caches.match('index.html').then((cached) => cached || fetch(request))
-    );
-    return;
-  }
-
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
-  );
+  const isCode = request.mode === 'navigate' || /\.(js|css|json|webmanifest)$/.test(url.pathname);
+  event.respondWith(isCode ? networkFirst(request) : cacheFirst(request));
 });
