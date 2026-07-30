@@ -1,7 +1,40 @@
 import { store } from '../store.js';
 import { mastery } from '../gamify.js';
+import { isConfigured, isSignedIn, getSession, meta } from '../sync.js';
+import { versionLine } from '../version.js';
 import { el, plural } from '../ui.js';
 import { navigate } from '../app.js';
+
+/** Uitnodiging om in te loggen, zolang synchroniseren nog niet aanstaat. */
+function syncCard() {
+  if (!isConfigured()) return null;
+  if (isSignedIn()) return null;
+  return el('div', { class: 'panel', style: 'margin-bottom:var(--space-6)' }, [
+    el('h3', { style: 'margin-bottom:var(--space-1)', text: 'Synchroniseren staat klaar' }),
+    el('p', { class: 'small muted', text: 'Log in en je kaarten en voortgang lopen gelijk op je telefoon en je pc.' }),
+    el('button', {
+      class: 'btn btn-primary btn-block',
+      onclick: () => navigate('#/settings'),
+      text: 'Inloggen',
+    }),
+  ]);
+}
+
+/** Voettekst met de versie, zodat je zonder zoeken ziet wat je voor je hebt. */
+function footer() {
+  const session = isSignedIn() ? getSession() : null;
+  const last = meta().lastSync;
+  const bits = [`Kaartjes ${versionLine()}`];
+  if (session) {
+    bits.push(`ingelogd als ${session.email || 'onbekend'}`);
+    if (last) bits.push(`gesynchroniseerd ${new Intl.DateTimeFormat('nl-NL', { timeStyle: 'short' }).format(new Date(last))}`);
+  }
+  return el('p', {
+    class: 'small muted',
+    style: 'text-align:center;margin:var(--space-8) 0 0',
+    text: bits.join(' · '),
+  });
+}
 
 function deckCard(deck) {
   const counts = store.counts(deck.id);
@@ -43,7 +76,9 @@ export function mount(root) {
         el('h1', { text: 'Nog geen decks' }),
         el('p', { class: 'muted', text: 'Laat een AI je lesstof omzetten naar kaarten en plak het resultaat hier.' }),
         el('button', { class: 'btn btn-primary', onclick: () => navigate('#/add'), text: 'Kaarten toevoegen' }),
-      ])
+      ]),
+      syncCard(),
+      footer()
     );
     return;
   }
@@ -58,6 +93,7 @@ export function mount(root) {
           ? `Je hebt vandaag nog ${plural(total.due, 'kaart', 'kaarten')} te doen.`
           : 'Er staat vandaag niets meer klaar. Morgen weer.',
       }),
+      syncCard(),
       total.due
         ? el('button', {
             class: 'btn btn-primary btn-block',
@@ -70,6 +106,7 @@ export function mount(root) {
       el('div', { class: 'row', style: 'margin-top:var(--space-6);justify-content:center' }, [
         el('button', { class: 'btn btn-secondary', onclick: () => navigate('#/add'), text: '+ Kaarten toevoegen' }),
       ]),
+      footer(),
     ])
   );
 }
