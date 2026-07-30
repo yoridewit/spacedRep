@@ -43,9 +43,13 @@ export function mount(root, params = {}) {
 
     el('div', { class: 'panel' }, [
       el('h3', { text: '1. Laat een AI de kaarten maken' }),
-      el('p', { class: 'small muted', text: 'Kopieer de opdracht en plak hem in ChatGPT, Claude of Gemini. Je krijgt JSON terug in het formaat dat deze app leest.' }),
-      topicInput,
-      el('label', { class: 'field', style: 'margin-top:var(--space-3)' }, [
+      el('p', { class: 'small muted', text: 'Kopieer de opdracht hieronder en plak hem in ChatGPT, Claude of Gemini. Wat je terugkrijgt hoef je alleen nog maar in stap 2 te plakken.' }),
+      el('label', { class: 'field' }, [
+        el('span', { class: 'label', text: 'Je lesstof of onderwerp' }),
+        topicInput,
+        el('span', { class: 'help', text: 'Mag leeg blijven — dan zet je de stof zelf onder de opdracht in je AI-gesprek.' }),
+      ]),
+      el('label', { class: 'field' }, [
         el('span', { class: 'label', text: 'Aantal kaarten' }),
         countInput,
       ]),
@@ -73,6 +77,7 @@ export function mount(root, params = {}) {
 
     el('div', { class: 'panel' }, [
       el('h3', { text: '2. Plak het antwoord' }),
+      el('p', { class: 'small muted', text: 'Plak hier wat de AI je gaf. Losse regels als "vraag :: antwoord" werken ook, net als een bestand dat je eerder hebt geëxporteerd.' }),
       input,
       el('div', { class: 'row', style: 'margin-top:var(--space-3)' }, [
         el('button', { class: 'btn btn-primary', text: 'Verwerken', onclick: () => handleParse(input.value) }),
@@ -93,6 +98,7 @@ export function mount(root, params = {}) {
     preview,
     library
   );
+
 
   function handleParse(text, fallbackName = 'Nieuwe deck') {
     clear(status);
@@ -155,7 +161,7 @@ export function mount(root, params = {}) {
         el('p', { class: 'small muted', style: 'margin:var(--space-2) 0 0', text: 'Kaarten die al in de deck staan worden overgeslagen, dus opnieuw importeren is veilig.' }),
       ]),
       el('div', { class: 'panel' }, [
-        el('h4', { text: 'Voorbeeld' }),
+        el('h4', { text: 'Zo zien je kaarten eruit' }),
         ...sample.map((c) =>
           el('div', { class: 'browse-item', style: 'cursor:default' }, [
             el('div', { class: 'grow' }, [
@@ -203,8 +209,9 @@ export function mount(root, params = {}) {
 }
 
 /**
- * Optioneel: decks die naast de app staan (decks/index.json). Handig om op je pc
- * een JSON-bestand toe te voegen en het op je telefoon binnen te halen.
+ * Kant-en-klare decks die bij de app zijn meegeleverd (decks/index.json).
+ * Bedoeld om de app te kunnen proberen zonder eerst een AI aan het werk te
+ * zetten; hoe je er zelf een toevoegt staat in de README, niet in de app.
  */
 async function loadLibrary(container, handleParse) {
   let index;
@@ -222,17 +229,20 @@ async function loadLibrary(container, handleParse) {
 
   clear(container).append(
     el('div', { class: 'panel' }, [
-      el('h3', { text: 'Bibliotheek' }),
-      el('p', { class: 'small muted', text: 'Decks die bij de app staan. Zet op je pc een JSON-bestand in de map decks/ en haal het hier op je telefoon binnen.' }),
+      el('h3', { text: 'Of pak een voorbeelddeck' }),
+      el('p', { class: 'small muted', text: 'Kant-en-klaar, om de app even te proberen. Je kunt het later gewoon verwijderen.' }),
       ...entries.map((entry) =>
         el('div', { class: 'browse-item', style: 'cursor:default' }, [
           el('div', { class: 'grow' }, [
             el('div', { class: 'q', text: entry.name || entry.file }),
-            el('div', { class: 'a', text: entry.description || (entry.cards ? `${entry.cards} kaarten` : entry.file) }),
+            el('div', {
+              class: 'small muted',
+              text: [entry.description, entry.cards ? `${entry.cards} kaarten` : null].filter(Boolean).join(' · '),
+            }),
           ]),
           el('button', {
             class: 'btn btn-secondary btn-sm',
-            text: 'Laden',
+            text: 'Toevoegen',
             onclick: async () => {
               try {
                 const res = await fetch(`decks/${entry.file}`, { cache: 'no-cache' });
