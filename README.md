@@ -11,7 +11,8 @@ iPhone te draaien én op je pc te gebruiken om kaarten toe te voegen.
 - **Werkt offline.** Alles staat in je eigen browser; geen server nodig.
 - **Synchroniseren tussen apparaten** (optioneel) via je eigen Supabase-project,
   met een echte merge in plaats van "laatste wint".
-- **Voortgang die motiveert.** Streak, XP, niveaus, badges en een oefenkalender.
+- **Voortgang die motiveert.** Dagdoel, streak met vriezers, XP, niveaus met
+  naam, prestaties in tredes en een oefenkalender.
 
 ## Snel starten
 
@@ -148,6 +149,39 @@ probleem, want:
 
 Heb je die geheime sleutel ooit ergens geplakt waar hij niet hoort: draai hem om
 via Project Settings → API keys.
+
+## Hoe de voortgang werkt
+
+Bewust zo ontworpen dat de tellers meebewegen met *leren*, niet met doorklikken.
+
+**XP** — 1 punt omdat je de kaart zag, +2 als je hem wist, en nog eens +2 als
+het een kaart was die je al drie weken of langer kende. Een nieuwe kaart leren
+levert +3 op. Een kaart wegklikken met "Opnieuw" levert dus het minimum op; een
+oude kaart die nog steeds zit, het meest. Zonder dat verschil wordt het lonend
+om makkelijke kaarten te malen — precies de bekendste kritiek op dit soort
+systemen.
+
+**Niveaus** — elk niveau kost 50 × het niveaunummer aan XP, dus ze worden
+steeds duurder. Elke fase heeft een naam: Zaadje, Spruit, Struik, Boom, Woud,
+Oerbos. Je ziet altijd hoeveel XP je nog van het volgende niveau af bent.
+
+**Dagdoel** — standaard 20 kaarten, in te stellen. Haal je het, dan is er een
+bonus van 10 XP. De balk staat op je startscherm en als ring bij je statistiek:
+zichtbare voortgang naar een doel is wat mensen over de streep trekt
+(goal-gradient effect).
+
+**Streak met vriezers** — je verdient een vriezer per vijf geoefende dagen,
+maximaal twee op voorraad. Mis je een dag, dan wordt er automatisch een ingezet
+en loopt je reeks door; in de kalender houdt die dag een randje. Dit is de
+meest aangehaalde reden dat mensen na een misser terugkomen in plaats van af te
+haken. Alleen gisteren kan bevroren worden — een reeks van vorige week
+repareren zou hem betekenisloos maken.
+
+**Prestaties in tredes** — zes prestaties met elk vier tredes (Brons, Zilver,
+Goud, Meester), bijvoorbeeld Volhouder (3/7/30/100 dagen op rij) en Beklijfd
+(25/100/500/2000 kaarten die je al drie weken kent). Je ziet je huidige trede,
+hoeveel je nog van de volgende af bent, en de lijst staat gesorteerd op wat het
+dichtst bij is.
 
 ## Hoe de planning werkt
 

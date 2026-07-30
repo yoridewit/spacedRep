@@ -7,7 +7,11 @@
 import { newSrsState, schedule, RATING, DEFAULT_CONFIG, DAY, MINUTE, dayKey, formatDelay } from '../js/srs.js';
 import { parseImport, cardKey, clozeNumbers, ParseError } from '../js/parse.js';
 import { renderMarkup, renderCloze, cardSummary } from '../js/markup.js';
-import { levelInfo, streak, mastery, badges, xpForAnswer } from '../js/gamify.js';
+import {
+  levelInfo, streak, mastery, achievements, xpForAnswer, xpToNext, tierFor,
+  dailyProgress, freezesAvailable, freezeToApply, newlyEarned, achievementTiers,
+  totalXp, XP_DAILY_GOAL,
+} from '../js/gamify.js';
 import { mergeStates, contentKey } from '../js/merge.js';
 import { dayTotal, mergeDay, normalizeDay } from '../js/daystats.js';
 import { looksSecret } from '../js/keycheck.js';
@@ -239,29 +243,90 @@ test('kaartsamenvatting blijft platte tekst', () => {
 
 // ── voortgang ────────────────────────────────────────────────────────────
 
-test('niveau volgt de XP', () => {
+test('niveaus worden steeds duurder', () => {
   eq(levelInfo(0).level, 1);
-  eq(levelInfo(120).level, 2);
-  eq(levelInfo(125).into, 5);
+  eq(xpToNext(1), 50);
+  eq(xpToNext(4), 200);
+  eq(levelInfo(49).level, 1, 'net niet genoeg voor niveau 2');
+  eq(levelInfo(50).level, 2);
+  eq(levelInfo(50).into, 0);
+  eq(levelInfo(200).level, 3, '50 + 100 kost niveau 3, 150 blijft over voor niveau 3');
+  assert(levelInfo(10_000).level > levelInfo(1_000).level, 'blijft oplopen');
 });
 
-test('XP beloont goede antwoorden en nieuwe kaarten', () => {
-  assert(xpForAnswer(RATING.GOOD, false) > xpForAnswer(RATING.AGAIN, false));
-  assert(xpForAnswer(RATING.GOOD, true) > xpForAnswer(RATING.GOOD, false));
+test('elke fase heeft een naam', () => {
+  eq(tierFor(1).name, 'Zaadje');
+  eq(tierFor(9).name, 'Spruit');
+  eq(tierFor(50).name, 'Oerbos');
+  eq(levelInfo(0).nextTier.name, 'Spruit', 'je ziet waar je naartoe werkt');
+});
+
+test('XP beloont onthouden boven doorklikken', () => {
+  const fout = xpForAnswer(RATING.AGAIN, {});
+  const goed = xpForAnswer(RATING.GOOD, {});
+  const rijp = xpForAnswer(RATING.GOOD, { mature: true });
+  const nieuw = xpForAnswer(RATING.GOOD, { wasNew: true });
+  assert(goed > fout, 'een goed antwoord levert meer op dan een fout');
+  assert(rijp > goed, 'een kaart die je al weken kent telt zwaarder');
+  assert(nieuw > goed, 'iets nieuws leren telt ook mee');
+  eq(xpForAnswer(RATING.AGAIN, { mature: true }), fout, 'fout blijft fout, ook bij een rijpe kaart');
+});
+
+test('dagdoel rekent met wat je vandaag deed', () => {
+  const stats = { [dayKey(NOW, 4)]: { dev_a: { reviews: 12 } } };
+  const halverwege = dailyProgress(stats, 20, NOW, 4);
+  eq(halverwege.done, 12);
+  eq(halverwege.reached, false);
+  eq(halverwege.progressPct, 60);
+  eq(dailyProgress(stats, 10, NOW, 4).reached, true);
+  eq(dailyProgress({}, 20, NOW, 4).progressPct, 0);
 });
 
 test('streak telt aaneengesloten dagen en breekt bij een gat', () => {
   const stats = {};
-  for (let i = 0; i < 4; i++) stats[dayKey(NOW - i * DAY, 4)] = { reviews: 3 };
-  eq(streak(stats, NOW, 4), 4);
+  for (let i = 0; i < 4; i++) stats[dayKey(NOW - i * DAY, 4)] = { dev_a: { reviews: 3 } };
+  eq(streak(stats, { now: NOW, cutoffHour: 4 }), 4);
   delete stats[dayKey(NOW - 2 * DAY, 4)];
-  eq(streak(stats, NOW, 4), 2);
+  eq(streak(stats, { now: NOW, cutoffHour: 4 }), 2);
 });
 
 test('een lege dag van vandaag breekt de streak nog niet', () => {
   const stats = {};
-  for (let i = 1; i < 4; i++) stats[dayKey(NOW - i * DAY, 4)] = { reviews: 3 };
-  eq(streak(stats, NOW, 4), 3);
+  for (let i = 1; i < 4; i++) stats[dayKey(NOW - i * DAY, 4)] = { dev_a: { reviews: 3 } };
+  eq(streak(stats, { now: NOW, cutoffHour: 4 }), 3);
+});
+
+test('een vriezer overbrugt een gemiste dag', () => {
+  const stats = {};
+  for (let i = 2; i < 6; i++) stats[dayKey(NOW - i * DAY, 4)] = { dev_a: { reviews: 5 } };
+  eq(streak(stats, { now: NOW, cutoffHour: 4 }), 0, 'zonder vriezer is de reeks weg');
+  const used = { [dayKey(NOW - DAY, 4)]: NOW };
+  eq(streak(stats, { used, now: NOW, cutoffHour: 4 }), 5, 'met vriezer loopt hij door');
+});
+
+test('vriezers verdien je door vol te houden, met een plafond', () => {
+  const stats = {};
+  eq(freezesAvailable(stats, {}), 0);
+  for (let i = 0; i < 5; i++) stats[dayKey(NOW - i * DAY, 4)] = { dev_a: { reviews: 1 } };
+  eq(freezesAvailable(stats, {}), 1, 'vijf dagen geoefend');
+  for (let i = 5; i < 30; i++) stats[dayKey(NOW - i * DAY, 4)] = { dev_a: { reviews: 1 } };
+  eq(freezesAvailable(stats, {}), 2, 'nooit meer dan twee op voorraad');
+  eq(freezesAvailable(stats, { [dayKey(NOW - 40 * DAY, 4)]: 1 }), 2, 'gebruikte vriezers gaan eraf');
+});
+
+test('een vriezer wordt alleen op gisteren ingezet, en alleen met een reeks', () => {
+  const stats = {};
+  for (let i = 2; i < 8; i++) stats[dayKey(NOW - i * DAY, 4)] = { dev_a: { reviews: 4 } };
+  eq(freezeToApply(stats, {}, NOW, 4), dayKey(NOW - DAY, 4));
+
+  const gisterenGedaan = { ...stats, [dayKey(NOW - DAY, 4)]: { dev_a: { reviews: 4 } } };
+  eq(freezeToApply(gisterenGedaan, {}, NOW, 4), null, 'niets te redden');
+
+  const alBevroren = { [dayKey(NOW - DAY, 4)]: NOW };
+  eq(freezeToApply(stats, alBevroren, NOW, 4), null, 'niet twee keer');
+
+  const geenReeks = { [dayKey(NOW - 9 * DAY, 4)]: { dev_a: { reviews: 4 } } };
+  eq(freezeToApply(geenReeks, {}, NOW, 4), null, 'er was geen reeks om te redden');
 });
 
 test('beheersing weegt rijpe kaarten vol en jonge half', () => {
@@ -275,14 +340,42 @@ test('beheersing weegt rijpe kaarten vol en jonge half', () => {
   eq(mastery([]), 0);
 });
 
-test('badges gaan open op hun drempel', () => {
-  const stats = { [dayKey(NOW, 4)]: { reviews: 1, again: 0 } };
-  const list = badges({ stats, cards: [] }, NOW, 4);
-  const byId = Object.fromEntries(list.map((b) => [b.id, b.unlocked]));
-  eq(byId.start, true);
-  eq(byId.honderd, false);
+test('prestaties hebben tredes met zichtbare voortgang', () => {
+  const stats = {};
+  for (let i = 0; i < 4; i++) stats[dayKey(NOW - i * DAY, 4)] = { dev_a: { reviews: 30, again: 0 } };
+  const list = achievements({ stats, cards: [], dailyGoal: 20 }, NOW, 4);
+  const volhouder = list.find((a) => a.id === 'volhouder');
+  eq(volhouder.tier, 1, 'vier dagen op rij is de eerste trede');
+  eq(volhouder.tierName, 'Brons');
+  eq(volhouder.goal, 7, 'de volgende trede staat op zeven');
+  eq(volhouder.remaining, 3);
+  eq(volhouder.nextTierName, 'Zilver');
+  assert(volhouder.progressPct > 0 && volhouder.progressPct < 100, `voortgang zichtbaar (${volhouder.progressPct}%)`);
+
+  const verzamelaar = list.find((a) => a.id === 'verzamelaar');
+  eq(verzamelaar.tier, 0, 'zonder kaarten nog niets');
+  eq(verzamelaar.tierName, null);
 });
 
+test('een hogere trede wordt gemeld, een gelijke niet', () => {
+  const maakStats = (dagen) => {
+    const stats = {};
+    for (let i = 0; i < dagen; i++) stats[dayKey(NOW - i * DAY, 4)] = { dev_a: { reviews: 5 } };
+    return stats;
+  };
+  const voor = achievementTiers(achievements({ stats: maakStats(3), cards: [] }, NOW, 4));
+  const zelfde = newlyEarned(voor, achievements({ stats: maakStats(4), cards: [] }, NOW, 4));
+  eq(zelfde.length, 0, 'nog steeds brons');
+  const hoger = newlyEarned(voor, achievements({ stats: maakStats(8), cards: [] }, NOW, 4));
+  eq(hoger.map((a) => a.id), ['volhouder']);
+  eq(hoger[0].tierName, 'Zilver');
+});
+
+test('totale XP telt alle dagen en apparaten op', () => {
+  const day = dayKey(NOW, 4);
+  eq(totalXp({ [day]: { dev_a: { xp: 30 }, dev_b: { xp: 12 } } }), 42);
+  assert(XP_DAILY_GOAL > 0, 'het dagdoel levert een bonus op');
+});
 
 // ── samenvoegen tussen apparaten ─────────────────────────────────────────
 
@@ -407,7 +500,7 @@ test('XP telt op over apparaten heen', () => {
   const stats = { [day]: { dev_pc: { reviews: 10, xp: 30 }, dev_tel: { reviews: 5, xp: 15 } } };
   eq(levelInfo(45).xp, 45);
   eq(dayTotal(stats[day]).xp, 45);
-  eq(streak(stats, NOW, 4), 1, 'de dag telt één keer voor de streak');
+  eq(streak(stats, { now: NOW, cutoffHour: 4 }), 1, 'de dag telt één keer voor de streak');
 });
 
 test('de nieuwste instellingen winnen, het thema blijft van het apparaat', () => {

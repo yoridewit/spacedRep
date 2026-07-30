@@ -711,17 +711,44 @@ textarea.input {
 .week .col i { width: 100%; border-radius: 6px 6px 0 0; background: var(--color-accent-500); display: block; min-height: 3px; }
 .week .col span { font-size: 10px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
 
-.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-3); }
-.badge {
+.goal-strip {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.level-panel { display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; }
+
+.goal-ring { position: relative; width: 92px; height: 92px; flex: none; }
+.goal-ring .ring-svg { position: absolute; inset: 0; }
+.goal-ring .ring-label {
+  position: absolute;
+  inset: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+}
+.goal-ring .ring-label strong { font-family: var(--font-heading); font-weight: 400; font-size: 18px; }
+.goal-ring .ring-label span { font-size: 10px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+
+.achievements { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--space-3); }
+.achievement {
+  display: flex;
+  align-items: flex-start;
   gap: var(--space-3);
   background: var(--color-surface);
   border-radius: var(--radius-md);
   padding: var(--space-3);
 }
-.badge.locked { opacity: .45; }
-.badge .icon {
+.achievement.locked { opacity: .6; }
+.achievement .icon {
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -729,10 +756,16 @@ textarea.input {
   align-items: center;
   justify-content: center;
   flex: none;
-  background: var(--color-accent-2-200);
-  color: var(--color-accent-2-800);
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-600);
 }
-.badge.locked .icon { background: var(--color-neutral-200); color: var(--color-neutral-600); }
+/* Tredes krijgen elk hun eigen kleur, zodat je in één blik ziet hoe ver je bent. */
+.achievement .icon.tier-1 { background: #e8d5bd; color: #7a5230; }
+.achievement .icon.tier-2 { background: var(--color-neutral-300); color: var(--color-neutral-800); }
+.achievement .icon.tier-3 { background: var(--color-accent-300); color: var(--color-accent-800); }
+.achievement .icon.tier-4 { background: var(--color-accent-2-400); color: var(--color-accent-2-900); }
+
+.calendar div.frozen { box-shadow: inset 0 0 0 2px var(--color-accent-2-500); }
 
 .deck-progress { display: flex; align-items: center; gap: var(--space-3); background: var(--color-surface); border-radius: var(--radius-md); padding: var(--space-3); }
 .deck-progress .name { font-size: 13px; font-weight: 700; width: 140px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

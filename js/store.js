@@ -5,7 +5,7 @@
 
 import { DEFAULT_CONFIG, newSrsState, schedule, dayKey, endOfDay, MINUTE } from './srs.js';
 import { cardKey } from './parse.js';
-import { xpForAnswer } from './gamify.js';
+import { xpForAnswer, freezeToApply, DEFAULT_DAILY_GOAL, XP_DAILY_GOAL, MATURE_DAYS } from './gamify.js';
 import { mergeStates, contentKey, emptyTombstones } from './merge.js';
 import { dayTotal, emptyDay, normalizeDay } from './daystats.js';
 import { deviceId } from './device.js';
@@ -17,6 +17,7 @@ const MAX_UNDO = 30;
 const MAX_LOG = 5000;
 
 export const DEFAULT_SETTINGS = {
+  dailyGoal: DEFAULT_DAILY_GOAL,
   newPerDay: 20,
   maxReviewsPerDay: 200,
   dayCutoffHour: 4,
@@ -37,6 +38,7 @@ function emptyState() {
     settings: { ...DEFAULT_SETTINGS, srs: { ...DEFAULT_CONFIG } },
     stats: {},
     tombstones: emptyTombstones(),
+    freezes: { used: {} },
     log: [],
   };
 }
@@ -71,6 +73,7 @@ class Store extends EventTarget {
       cards: data.cards || {},
       stats: data.stats || {},
       tombstones: { ...emptyTombstones(), ...(data.tombstones || {}) },
+      freezes: { used: { ...(data.freezes?.used || {}) } },
       log: Array.isArray(data.log) ? data.log : [],
     };
     for (const [day, entry] of Object.entries(state.stats)) {
@@ -270,6 +273,31 @@ class Store extends EventTarget {
     return dayTotal(this.state.stats[dayKey(now, this.settings.dayCutoffHour)]);
   }
 
+  /** Is de dagdoelbonus vandaag al gegeven, op welk apparaat dan ook? */
+  goalBonusGiven(now = Date.now()) {
+    const day = this.state.stats[dayKey(now, this.settings.dayCutoffHour)];
+    if (!day) return false;
+    return Object.values(day).some((bucket) => bucket && bucket.goalBonus);
+  }
+
+  get freezes() {
+    if (!this.state.freezes) this.state.freezes = { used: {} };
+    return this.state.freezes;
+  }
+
+  /**
+   * Zet zo nodig een vriezer op gisteren, zodat één gemiste dag je reeks niet
+   * meteen op nul gooit. Wordt bij het openen van de app aangeroepen.
+   * @returns {string|null} de bevroren dag
+   */
+  useFreezeIfNeeded(now = Date.now()) {
+    const day = freezeToApply(this.state.stats, this.freezes.used, now, this.settings.dayCutoffHour);
+    if (!day) return null;
+    this.freezes.used[day] = Date.now();
+    this.changed({ type: 'freeze', day });
+    return day;
+  }
+
   remainingToday(now = Date.now()) {
     const t = this.today(now);
     const { newPerDay, maxReviewsPerDay } = this.settings;
@@ -358,9 +386,18 @@ class Store extends EventTarget {
     card.srs = next;
 
     const stats = this.todayBucket(now);
-    const xp = xpForAnswer(rating, wasNew);
+    const mature = before.state === 'review' && before.interval >= MATURE_DAYS;
+    let xp = xpForAnswer(rating, { wasNew, mature });
     if (wasNew) stats.new++;
     stats.reviews++;
+
+    // Bonus zodra je je dagdoel haalt — eenmaal per dag, over al je apparaten heen.
+    const goal = Math.max(1, this.settings.dailyGoal || DEFAULT_DAILY_GOAL);
+    const goalBonus = !this.goalBonusGiven(now) && this.today(now).reviews >= goal;
+    if (goalBonus) {
+      xp += XP_DAILY_GOAL;
+      stats.goalBonus = 1;
+    }
     stats.xp += xp;
     stats.ms += Math.min(elapsedMs, 5 * 60 * 1000);
     stats.again += rating === 1 ? 1 : 0;
@@ -371,7 +408,7 @@ class Store extends EventTarget {
     this.state.log.push({ cardId, ts: now, rating, interval: next.interval, state: next.state });
     if (this.state.log.length > MAX_LOG) this.state.log.splice(0, this.state.log.length - MAX_LOG);
 
-    this.undoStack.push({ cardId, srs: before, wasNew, rating, xp, device: deviceId(), dayKey: dayKey(now, this.settings.dayCutoffHour) });
+    this.undoStack.push({ cardId, srs: before, wasNew, rating, xp, goalBonus, device: deviceId(), dayKey: dayKey(now, this.settings.dayCutoffHour) });
     if (this.undoStack.length > MAX_UNDO) this.undoStack.shift();
 
     this.changed({ type: 'answer', cardId });
@@ -392,6 +429,7 @@ class Store extends EventTarget {
     if (stats) {
       stats.reviews = Math.max(0, stats.reviews - 1);
       stats.xp = Math.max(0, (stats.xp || 0) - (last.xp || 0));
+      if (last.goalBonus) delete stats.goalBonus;
       if (last.wasNew) stats.new = Math.max(0, stats.new - 1);
       const bucket = { 1: 'again', 2: 'hard', 3: 'good', 4: 'easy' }[last.rating];
       if (bucket) stats[bucket] = Math.max(0, stats[bucket] - 1);
@@ -437,6 +475,7 @@ class Store extends EventTarget {
       stats: this.state.stats,
       settings: this.state.settings,
       tombstones: this.state.tombstones || emptyTombstones(),
+      freezes: this.freezes,
     };
   }
 
@@ -451,6 +490,7 @@ class Store extends EventTarget {
     this.state.stats = merged.stats;
     this.state.settings = { ...merged.settings, srs: { ...DEFAULT_CONFIG, ...(merged.settings?.srs || {}) } };
     this.state.tombstones = merged.tombstones;
+    this.state.freezes = merged.freezes;
     this.undoStack = this.undoStack.filter((u) => this.state.cards[u.cardId]);
     this.save({ immediate: true });
     this.dispatchEvent(new CustomEvent('change', { detail: { type: 'sync' } }));

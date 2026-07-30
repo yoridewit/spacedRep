@@ -1,43 +1,157 @@
 /**
- * Streak, XP, niveaus en badges. Alles wordt afgeleid uit de dagstatistiek die
- * de store toch al bijhoudt — er is dus niets extra's om kwijt te raken.
+ * Voortgang: XP, niveaus, dagdoel, streak (met vriezer) en prestaties.
+ *
+ * Alles wordt afgeleid uit de dagstatistiek en de kaarten die de store toch al
+ * bijhoudt; het enige dat apart wordt opgeslagen zijn de gebruikte vriezers.
+ *
+ * Drie keuzes, met reden:
+ *
+ * 1. XP beloont onthouden, niet doorklikken. Een kaart die je al weken kent en
+ *    nog steeds goed hebt levert het meest op; een kaart wegklikken met
+ *    "Opnieuw" levert alleen het minimum. Anders wordt het interessant om veel
+ *    makkelijke kaarten te malen, en dat is precies wat de kritiek op dit soort
+ *    systemen is: de teller loopt terwijl je niets leert.
+ *
+ * 2. Niveaus worden langzamer, met een naam per fase. Een getal dat eeuwig
+ *    doortelt zegt niets; "Struik" of "Woud" onthoud je wel.
+ *
+ * 3. Een streak mag niet breken door één drukke dag. Je verdient vriezers door
+ *    vol te houden en die worden automatisch ingezet — de bekendste reden dat
+ *    mensen na een gemiste dag tóch terugkomen.
  */
 
-import { dayKey, DAY } from './srs.js';
+import { dayKey, DAY, RATING } from './srs.js';
 import { dayTotal } from './daystats.js';
 
-export const XP_PER_ANSWER = 2;
-export const XP_CORRECT_BONUS = 1;
-export const XP_NEW_CARD_BONUS = 3;
-export const XP_PER_LEVEL = 120;
+// ── XP ───────────────────────────────────────────────────────────────────
 
-export function xpForAnswer(rating, wasNew) {
-  return XP_PER_ANSWER + (rating >= 3 ? XP_CORRECT_BONUS : 0) + (wasNew ? XP_NEW_CARD_BONUS : 0);
+export const XP_SEEN = 1;          // je hebt de kaart gezien
+export const XP_CORRECT = 2;       // en je wist hem
+export const XP_MATURE_BONUS = 2;  // een kaart die je al weken kent
+export const XP_NEW_CARD = 3;      // iets nieuws geleerd
+export const XP_DAILY_GOAL = 10;   // dagdoel gehaald
+
+export const MATURE_DAYS = 21;
+
+/**
+ * @param {number} rating
+ * @param {{wasNew?: boolean, mature?: boolean}} context
+ */
+export function xpForAnswer(rating, context = {}) {
+  const { wasNew = false, mature = false } = typeof context === 'boolean' ? { wasNew: context } : context;
+  let xp = XP_SEEN;
+  if (rating >= RATING.GOOD) {
+    xp += XP_CORRECT;
+    if (mature) xp += XP_MATURE_BONUS;
+  }
+  if (wasNew) xp += XP_NEW_CARD;
+  return xp;
 }
 
 export function totalXp(stats) {
   return Object.values(stats).reduce((sum, day) => sum + dayTotal(day).xp, 0);
 }
 
-export function levelInfo(xp) {
-  const level = Math.floor(xp / XP_PER_LEVEL) + 1;
-  const into = xp % XP_PER_LEVEL;
-  return { level, xp, into, needed: XP_PER_LEVEL, progressPct: Math.round((into / XP_PER_LEVEL) * 100) };
+// ── niveaus ──────────────────────────────────────────────────────────────
+
+const TIERS = [
+  { from: 1, name: 'Zaadje' },
+  { from: 5, name: 'Spruit' },
+  { from: 10, name: 'Struik' },
+  { from: 20, name: 'Boom' },
+  { from: 35, name: 'Woud' },
+  { from: 50, name: 'Oerbos' },
+];
+
+/** Wat niveau `level` kost om te halen. Elk niveau wordt iets duurder. */
+export function xpToNext(level) {
+  return 50 * Math.max(1, level);
 }
 
-/** Aantal aaneengesloten dagen met minstens één beantwoorde kaart. */
-export function streak(stats, now = Date.now(), cutoffHour = 4) {
+export function tierFor(level) {
+  let found = TIERS[0];
+  for (const tier of TIERS) if (level >= tier.from) found = tier;
+  return found;
+}
+
+function nextTierFor(level) {
+  return TIERS.find((tier) => tier.from > level) || null;
+}
+
+export function levelInfo(xp) {
+  let level = 1;
+  let rest = Math.max(0, xp);
+  while (rest >= xpToNext(level) && level < 500) {
+    rest -= xpToNext(level);
+    level++;
+  }
+  const needed = xpToNext(level);
+  return {
+    xp,
+    level,
+    into: rest,
+    needed,
+    progressPct: Math.round((rest / needed) * 100),
+    tier: tierFor(level).name,
+    nextTier: nextTierFor(level),
+  };
+}
+
+// ── dagdoel ──────────────────────────────────────────────────────────────
+
+export const DEFAULT_DAILY_GOAL = 20;
+
+export function dailyProgress(stats, goal = DEFAULT_DAILY_GOAL, now = Date.now(), cutoffHour = 4) {
+  const done = dayTotal(stats[dayKey(now, cutoffHour)]).reviews;
+  const target = Math.max(1, goal);
+  return { done, goal: target, reached: done >= target, progressPct: Math.min(100, Math.round((done / target) * 100)) };
+}
+
+// ── streak, met vriezer ──────────────────────────────────────────────────
+
+export const MAX_FREEZES = 2;
+export const DAYS_PER_FREEZE = 5;
+
+const studied = (stats, key) => dayTotal(stats[key]).reviews > 0;
+
+/**
+ * Aaneengesloten dagen. Een dag telt mee als je geoefend hebt, of als er een
+ * vriezer op staat. Vandaag nog niets gedaan breekt de reeks niet.
+ */
+export function streak(stats, { used = {}, now = Date.now(), cutoffHour = 4 } = {}) {
   let count = 0;
   for (let i = 0; i < 3650; i++) {
     const key = dayKey(now - i * DAY, cutoffHour);
-    const day = dayTotal(stats[key]);
-    if (day.reviews) count++;
-    else if (i > 0) break; // vandaag nog niets gedaan telt niet als onderbreking
+    if (studied(stats, key)) count++;
+    else if (used[key]) count++;
+    else if (i > 0) break;
   }
   return count;
 }
 
-/** Score van een dag (of van een al opgeteld totaal). */
+/** Verdiende vriezers: eentje per vijf geoefende dagen, maximaal twee op voorraad. */
+export function freezesAvailable(stats, used = {}) {
+  const days = Object.keys(stats).filter((key) => studied(stats, key)).length;
+  const earned = Math.floor(days / DAYS_PER_FREEZE);
+  return Math.max(0, Math.min(MAX_FREEZES, earned - Object.keys(used).length));
+}
+
+/**
+ * Bepaalt of er een vriezer op gisteren gezet moet worden. Alleen gisteren:
+ * een reeks van vorige week repareren zou de streak betekenisloos maken.
+ * @returns {string|null} de dag die bevroren moet worden
+ */
+export function freezeToApply(stats, used = {}, now = Date.now(), cutoffHour = 4) {
+  const yesterday = dayKey(now - DAY, cutoffHour);
+  if (studied(stats, yesterday) || used[yesterday]) return null;
+  const before = dayKey(now - 2 * DAY, cutoffHour);
+  if (!studied(stats, before) && !used[before]) return null; // er was geen reeks om te redden
+  if (freezesAvailable(stats, used) <= 0) return null;
+  return yesterday;
+}
+
+// ── overige afgeleiden ───────────────────────────────────────────────────
+
 export function accuracy(day) {
   const total = dayTotal(day);
   if (!total.reviews) return null;
@@ -51,12 +165,11 @@ export function mastery(cards) {
   for (const card of cards) {
     const s = card.srs;
     if (s.state !== 'review') continue;
-    score += s.interval >= 21 ? 1 : 0.5;
+    score += s.interval >= MATURE_DAYS ? 1 : 0.5;
   }
   return Math.round((score / cards.length) * 100);
 }
 
-/** Vijf weken activiteit voor de kalender, oudste eerst. */
 export function calendar(stats, weeks = 5, now = Date.now(), cutoffHour = 4) {
   const days = weeks * 7;
   const out = [];
@@ -70,48 +183,107 @@ export function calendar(stats, weeks = 5, now = Date.now(), cutoffHour = 4) {
 
 const WEEKDAYS = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
 
-/** Score per dag over de laatste zeven dagen. */
 export function weekly(stats, now = Date.now(), cutoffHour = 4) {
   const out = [];
   for (let i = 6; i >= 0; i--) {
     const ts = now - i * DAY;
     const day = dayTotal(stats[dayKey(ts, cutoffHour)]);
-    out.push({
-      label: WEEKDAYS[new Date(ts).getDay()],
-      reviews: day.reviews,
-      accuracy: accuracy(day),
-    });
+    out.push({ label: WEEKDAYS[new Date(ts).getDay()], reviews: day.reviews, accuracy: accuracy(day) });
   }
   return out;
 }
 
-const BADGES = [
-  { id: 'start', name: 'Eerste stap', desc: 'Je eerste kaart beantwoord', test: (c) => c.answered >= 1 },
-  { id: 'honderd', name: 'Op dreef', desc: '100 kaarten beantwoord', test: (c) => c.answered >= 100 },
-  { id: 'duizend', name: 'Doorbijter', desc: '1000 kaarten beantwoord', test: (c) => c.answered >= 1000 },
-  { id: 'week', name: 'Volle week', desc: '7 dagen op rij geoefend', test: (c) => c.streak >= 7 },
-  { id: 'maand', name: 'Maandmaker', desc: '30 dagen op rij geoefend', test: (c) => c.streak >= 30 },
-  { id: 'scherp', name: 'Scherpschutter', desc: '90% score op een dag met 20+ kaarten', test: (c) => c.sharpDay },
-  { id: 'rijp', name: 'Beklijfd', desc: '50 kaarten met een interval van 3 weken of meer', test: (c) => c.mature >= 50 },
-  { id: 'bieb', name: 'Verzamelaar', desc: '500 kaarten in je decks', test: (c) => c.cards >= 500 },
+// ── prestaties ───────────────────────────────────────────────────────────
+
+const TIER_NAMES = ['Brons', 'Zilver', 'Goud', 'Meester'];
+
+const ACHIEVEMENTS = [
+  {
+    id: 'volhouder',
+    name: 'Volhouder',
+    unit: 'dagen op rij',
+    tiers: [3, 7, 30, 100],
+    value: (c) => c.streak,
+  },
+  {
+    id: 'kilometers',
+    name: 'Kilometervreter',
+    unit: 'kaarten beantwoord',
+    tiers: [100, 1000, 5000, 20000],
+    value: (c) => c.answered,
+  },
+  {
+    id: 'beklijfd',
+    name: 'Beklijfd',
+    unit: 'kaarten die je al 3 weken kent',
+    tiers: [25, 100, 500, 2000],
+    value: (c) => c.mature,
+  },
+  {
+    id: 'scherp',
+    name: 'Scherpschutter',
+    unit: 'dagen met 90% of hoger (bij 20+ kaarten)',
+    tiers: [1, 10, 50, 200],
+    value: (c) => c.sharpDays,
+  },
+  {
+    id: 'doelbewust',
+    name: 'Doelbewust',
+    unit: 'dagen je dagdoel gehaald',
+    tiers: [5, 25, 100, 365],
+    value: (c) => c.goalDays,
+  },
+  {
+    id: 'verzamelaar',
+    name: 'Verzamelaar',
+    unit: 'kaarten in je decks',
+    tiers: [100, 500, 2000, 10000],
+    value: (c) => c.cards,
+  },
 ];
 
 /**
- * @param {{stats: object, cards: Array}} ctx
- * @returns {Array<{id, name, desc, unlocked}>}
+ * @param {{stats: object, cards: Array, used?: object, dailyGoal?: number}} input
+ * @returns {Array} prestaties met hun huidige trede en de voortgang naar de volgende
  */
-export function badges({ stats, cards }, now = Date.now(), cutoffHour = 4) {
+export function achievements({ stats, cards, used = {}, dailyGoal = DEFAULT_DAILY_GOAL }, now = Date.now(), cutoffHour = 4) {
   const days = Object.values(stats).map(dayTotal);
   const context = {
+    streak: streak(stats, { used, now, cutoffHour }),
     answered: days.reduce((n, d) => n + d.reviews, 0),
-    streak: streak(stats, now, cutoffHour),
-    sharpDay: days.some((d) => d.reviews >= 20 && accuracy(d) >= 90),
-    mature: cards.filter((c) => c.srs.state === 'review' && c.srs.interval >= 21).length,
+    mature: cards.filter((c) => c.srs.state === 'review' && c.srs.interval >= MATURE_DAYS).length,
+    sharpDays: days.filter((d) => d.reviews >= 20 && accuracy(d) >= 90).length,
+    goalDays: days.filter((d) => d.reviews >= Math.max(1, dailyGoal)).length,
     cards: cards.length,
   };
-  return BADGES.map((b) => ({ id: b.id, name: b.name, desc: b.desc, unlocked: Boolean(b.test(context)) }));
+
+  return ACHIEVEMENTS.map((achievement) => {
+    const value = achievement.value(context);
+    const reached = achievement.tiers.filter((threshold) => value >= threshold).length;
+    const next = achievement.tiers[reached] ?? null;
+    const previous = reached > 0 ? achievement.tiers[reached - 1] : 0;
+    const span = next ? next - previous : 1;
+    return {
+      id: achievement.id,
+      name: achievement.name,
+      unit: achievement.unit,
+      value,
+      tier: reached,                                   // 0 = nog niet behaald
+      tierName: reached > 0 ? TIER_NAMES[reached - 1] : null,
+      nextTierName: next ? TIER_NAMES[reached] : null,
+      goal: next,
+      progressPct: next ? Math.min(100, Math.round(((value - previous) / span) * 100)) : 100,
+      remaining: next ? Math.max(0, next - value) : 0,
+      complete: next === null,
+    };
+  });
 }
 
-export function unlockedIds(list) {
-  return new Set(list.filter((b) => b.unlocked).map((b) => b.id));
+/** Momentopname om na een sessie te kunnen zien wat er nieuw is. */
+export function achievementTiers(list) {
+  return Object.fromEntries(list.map((a) => [a.id, a.tier]));
+}
+
+export function newlyEarned(before = {}, after = []) {
+  return after.filter((a) => a.tier > (before[a.id] ?? 0));
 }

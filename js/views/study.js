@@ -1,7 +1,7 @@
 import { store } from '../store.js';
 import { RATING, previewIntervals } from '../srs.js';
 import { renderMarkup, renderCloze, cardSummary } from '../markup.js';
-import { badges, unlockedIds, totalXp, streak } from '../gamify.js';
+import { achievements, achievementTiers, newlyEarned, totalXp, streak, dailyProgress } from '../gamify.js';
 import { el, clear, appendAll, toast, confirmDialog } from '../ui.js';
 import { icon } from '../icons.js';
 import { setChrome, navigate } from '../app.js';
@@ -31,12 +31,21 @@ export function mount(root, params = {}) {
     startedWith: Math.max(1, store.counts(deckId).due),
     shownAt: Date.now(),
     xpStart: totalXp(store.stats),
-    badgesStart: unlockedIds(badges({ stats: store.stats, cards: store.allCards() }, Date.now(), cutoff)),
+    tiersStart: achievementTiers(achievements(achievementInput(), Date.now(), cutoff)),
   };
 
   let card = null;
   let revealed = false;
   let editing = false;
+
+  function achievementInput() {
+    return {
+      stats: store.stats,
+      cards: store.allCards(),
+      used: store.freezes.used,
+      dailyGoal: store.settings.dailyGoal,
+    };
+  }
 
   const progressFill = el('i', { style: 'width:0%' });
   const counter = el('div', { class: 'session-counter' }, [icon('flame', 15), el('span', { text: '0/0' })]);
@@ -254,9 +263,9 @@ export function mount(root, params = {}) {
 
     const accuracyPct = session.answered ? Math.round((session.correct / session.answered) * 100) : 0;
     const gainedXp = Math.max(0, totalXp(store.stats) - session.xpStart);
-    const days = streak(store.stats, Date.now(), cutoff);
-    const now = badges({ stats: store.stats, cards: store.allCards() }, Date.now(), cutoff);
-    const fresh = now.find((b) => b.unlocked && !session.badgesStart.has(b.id));
+    const days = streak(store.stats, { used: store.freezes.used, cutoffHour: cutoff });
+    const goal = dailyProgress(store.stats, store.settings.dailyGoal, Date.now(), cutoff);
+    const fresh = newlyEarned(session.tiersStart, achievements(achievementInput(), Date.now(), cutoff))[0];
     const stillDue = store.counts(deckId).due;
 
     const confetti = accuracyPct >= 80 && session.answered >= 5
@@ -283,9 +292,15 @@ export function mount(root, params = {}) {
           ? el('div', { class: 'unlock' }, [
               icon('medal', 22),
               el('div', {}, [
-                el('div', { style: 'font-weight:700;font-size:13px', text: 'Badge ontgrendeld' }),
-                el('div', { style: 'font-size:12px;opacity:.85', text: fresh.name }),
+                el('div', { style: 'font-weight:700;font-size:13px', text: `${fresh.tierName} ontgrendeld` }),
+                el('div', { style: 'font-size:12px;opacity:.85', text: `${fresh.name} — ${fresh.value} ${fresh.unit}` }),
               ]),
+            ])
+          : null,
+        session.answered
+          ? el('div', { style: 'margin-bottom:var(--space-4)' }, [
+              el('div', { class: 'small muted', style: 'margin-bottom:6px', text: goal.reached ? `Dagdoel gehaald: ${goal.done} van ${goal.goal} kaarten` : `Dagdoel: ${goal.done} van ${goal.goal} kaarten` }),
+              el('div', { class: 'bar' }, [el('i', { style: `width:${goal.progressPct}%;background:${goal.reached ? 'var(--color-accent-2-500)' : 'var(--color-accent)'}` })]),
             ])
           : null,
         el('div', { class: 'session-counter', style: 'justify-content:center;margin-bottom:var(--space-6)' }, [

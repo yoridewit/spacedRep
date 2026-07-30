@@ -1,5 +1,5 @@
 import { store } from '../store.js';
-import { mastery } from '../gamify.js';
+import { mastery, dailyProgress } from '../gamify.js';
 import { isConfigured, isSignedIn, authSkipped, getSession, meta } from '../sync.js';
 import { versionLine } from '../version.js';
 import { el, appendAll, plural } from '../ui.js';
@@ -17,6 +17,20 @@ function syncCard() {
       onclick: () => navigate('#/inloggen'),
       text: 'Alsnog inloggen',
     }),
+  ]);
+}
+
+/** Smalle balk met je dagdoel; zichtbare voortgang werkt beter dan een getal. */
+function goalStrip() {
+  const goal = dailyProgress(store.stats, store.settings.dailyGoal, Date.now(), store.settings.dayCutoffHour);
+  return el('a', { class: 'goal-strip', href: '#/stats' }, [
+    el('div', { class: 'row', style: 'justify-content:space-between;flex-wrap:nowrap;margin-bottom:6px' }, [
+      el('span', { class: 'small', style: 'font-weight:700', text: goal.reached ? 'Dagdoel gehaald' : 'Dagdoel vandaag' }),
+      el('span', { class: 'small muted', text: `${goal.done}/${goal.goal}` }),
+    ]),
+    el('div', { class: 'bar' }, [
+      el('i', { style: `width:${goal.progressPct}%${goal.reached ? ';background:var(--color-accent-2-500)' : ''}` }),
+    ]),
   ]);
 }
 
@@ -95,6 +109,7 @@ export function mount(root) {
           ? `Je hebt vandaag nog ${plural(total.due, 'kaart', 'kaarten')} te doen.`
           : 'Er staat vandaag niets meer klaar. Morgen weer.',
       }),
+      goalStrip(),
       syncCard(),
       total.due
         ? el('button', {

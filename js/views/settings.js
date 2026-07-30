@@ -23,6 +23,7 @@ function numberInput(value, { min = 0, max = 9999, step = 1 } = {}) {
 export function mount(root, params = {}) {
   const s = store.settings;
 
+  const dailyGoal = numberInput(s.dailyGoal ?? 20, { min: 1, max: 500 });
   const newPerDay = numberInput(s.newPerDay, { min: 0, max: 999 });
   const maxReviews = numberInput(s.maxReviewsPerDay, { min: 0, max: 9999 });
   const cutoff = numberInput(s.dayCutoffHour, { min: 0, max: 12 });
@@ -48,6 +49,7 @@ export function mount(root, params = {}) {
 
   const saveAll = () => {
     store.updateSettings({
+      dailyGoal: Math.max(1, Number(dailyGoal.value) || 20),
       newPerDay: Number(newPerDay.value) || 0,
       maxReviewsPerDay: Number(maxReviews.value) || 0,
       dayCutoffHour: Math.min(12, Math.max(0, Number(cutoff.value) || 0)),
@@ -63,7 +65,7 @@ export function mount(root, params = {}) {
     toast('Opgeslagen');
   };
 
-  for (const control of [newPerDay, maxReviews, cutoff, theme, steps, relearnSteps, graduating, easyInterval, maxInterval]) {
+  for (const control of [dailyGoal, newPerDay, maxReviews, cutoff, theme, steps, relearnSteps, graduating, easyInterval, maxInterval]) {
     control.addEventListener('change', saveAll);
   }
 
@@ -74,6 +76,7 @@ export function mount(root, params = {}) {
     el('h1', { text: 'Instellingen' }),
     el('h2', { class: 'section-title', text: 'Dagelijks' }),
     el('div', { class: 'panel' }, [
+      field('Dagdoel (kaarten per dag)', dailyGoal, 'Waar je je streak mee opbouwt. Haal je het, dan levert dat een bonus op.'),
       field('Nieuwe kaarten per dag', newPerDay, 'Hoeveel nieuwe kaarten je per dag maximaal krijgt. 20 is een prima start.'),
       field('Maximaal herhalingen per dag', maxReviews, 'Rem voor drukke dagen. Kaarten die je niet haalt schuiven door.'),
       field('Nieuwe dag begint om (uur)', cutoff, 'Standaard 4 uur, zodat laat doorleren nog bij gisteren telt.'),

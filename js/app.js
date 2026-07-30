@@ -61,13 +61,23 @@ export function backButton(href = '#/') {
 }
 
 function streakChip() {
-  const days = streak(store.stats, Date.now(), store.settings.dayCutoffHour);
-  return el('div', { class: 'chip flame', title: 'Dagen op rij geoefend' }, [icon('flame'), `${days} ${days === 1 ? 'dag' : 'dagen'}`]);
+  const days = streak(store.stats, { used: store.freezes.used, cutoffHour: store.settings.dayCutoffHour });
+  return el('a', {
+    class: 'chip flame',
+    href: '#/stats',
+    style: 'text-decoration:none',
+    title: 'Dagen op rij geoefend',
+  }, [icon('flame'), `${days} ${days === 1 ? 'dag' : 'dagen'}`]);
 }
 
 function levelChip() {
-  const { level } = levelInfo(totalXp(store.stats));
-  return el('a', { class: 'chip olive', href: '#/stats', style: 'text-decoration:none', title: 'Bekijk je voortgang' }, [`Niveau ${level}`]);
+  const { level, tier } = levelInfo(totalXp(store.stats));
+  return el('a', {
+    class: 'chip olive',
+    href: '#/stats',
+    style: 'text-decoration:none',
+    title: `Niveau ${level}`,
+  }, [`${tier} · ${level}`]);
 }
 
 function appHeader(route) {
@@ -181,9 +191,13 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// Eén gemiste dag mag je reeks niet breken zolang je vriezers hebt.
+const frozen = store.useFreezeIfNeeded();
+
 const handledAuthHash = await consumeAuthHash();
 if (!handledAuthHash) render();
 
+if (frozen) toast('Gisteren gemist — een vriezer heeft je reeks gered', 4000);
 if (isSignedIn()) syncQuietly();
 window.addEventListener('online', () => syncQuietly());
 

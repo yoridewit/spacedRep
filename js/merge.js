@@ -134,6 +134,10 @@ export function mergeStates(local, remote) {
     stats[day] = mergeDay(local.stats?.[day], remote.stats?.[day]);
   }
 
+  // ── vriezers ───────────────────────────────────────────────────────────
+  // Een dag die aan één kant bevroren is, blijft bevroren.
+  const freezes = { used: { ...(local.freezes?.used || {}), ...(remote.freezes?.used || {}) } };
+
   // ── instellingen ───────────────────────────────────────────────────────
   // De nieuwste wint, behalve het thema: dat is een voorkeur per apparaat.
   const localAt = local.settings?.settingsUpdatedAt || 0;
@@ -142,5 +146,5 @@ export function mergeStates(local, remote) {
     ? { ...remote.settings, theme: local.settings?.theme ?? remote.settings?.theme }
     : local.settings;
 
-  return { state: { decks, cards, stats, settings, tombstones }, summary };
+  return { state: { decks, cards, stats, settings, tombstones, freezes }, summary };
 }
