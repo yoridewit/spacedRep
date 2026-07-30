@@ -159,6 +159,11 @@ je een geleerde kaart fout hebt.
 - **Goed** — interval × ease (start 2,5).
 - **Makkelijk** — interval × ease × 1,3, ease +0.15.
 
+Tijdens het overhoren kun je op elke kaartzijde de tekst rechtstreeks
+bijwerken (potloodje — de tekst wordt een invoerveld, Esc annuleert en
+Ctrl/Cmd+Enter slaat op) of de kaart weggooien (prullenbak, met bevestiging).
+Je blijft daarbij gewoon in je sessie.
+
 Nieuwe kaarten doorlopen eerst de leerstappen (standaard 1 en 10 minuten) en
 krijgen daarna een interval van 1 dag. Intervallen krijgen een kleine spreiding
 zodat niet alles op dezelfde dag terugkomt. De dag rolt om 4 uur 's nachts om,

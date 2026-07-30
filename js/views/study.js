@@ -1,8 +1,8 @@
 import { store } from '../store.js';
 import { RATING, previewIntervals } from '../srs.js';
-import { renderMarkup, renderCloze } from '../markup.js';
+import { renderMarkup, renderCloze, cardSummary } from '../markup.js';
 import { badges, unlockedIds, totalXp, streak } from '../gamify.js';
-import { el, clear, toast } from '../ui.js';
+import { el, clear, appendAll, toast, confirmDialog } from '../ui.js';
 import { icon } from '../icons.js';
 import { setChrome, navigate } from '../app.js';
 import { syncQuietly } from '../sync.js';
@@ -36,6 +36,7 @@ export function mount(root, params = {}) {
 
   let card = null;
   let revealed = false;
+  let editing = false;
 
   const progressFill = el('i', { style: 'width:0%' });
   const counter = el('div', { class: 'session-counter' }, [icon('flame', 15), el('span', { text: '0/0' })]);
@@ -53,7 +54,7 @@ export function mount(root, params = {}) {
   ]);
 
   const stage = el('section', { class: 'study-main' });
-  const hint = el('div', { class: 'kbd-hint', text: 'Spatie = omdraaien · 1-4 = beoordelen · U = ongedaan maken' });
+  const hint = el('div', { class: 'kbd-hint', text: 'Spatie = omdraaien · 1-4 = beoordelen · E = bewerken · U = ongedaan maken' });
   root.append(stage, hint);
 
   function questionHtml(c) {
@@ -73,35 +74,142 @@ export function mount(root, params = {}) {
     undoBtn.disabled = !store.canUndo();
   }
 
+  /** Knopjes rechtsboven op een kaartzijde; die mogen de kaart niet omdraaien. */
+  function faceTools(side) {
+    return el('div', { class: 'face-tools', onclick: (event) => event.stopPropagation() }, [
+      el('button', {
+        class: 'face-tool',
+        'aria-label': side === 'front' ? 'Vraag bewerken' : 'Antwoord bewerken',
+        title: 'Bewerken',
+        onclick: () => startEdit(side),
+      }, [icon('pencil', 15)]),
+      el('button', {
+        class: 'face-tool danger',
+        'aria-label': 'Kaart verwijderen',
+        title: 'Verwijderen',
+        onclick: removeCard,
+      }, [icon('trash', 15)]),
+    ]);
+  }
+
+  function faceContent(side) {
+    if (side === 'front') {
+      return [
+        faceTools('front'),
+        el('span', { class: 'kicker', text: card.type === 'cloze' ? 'Vul aan' : 'Vraag' }),
+        el('div', { class: 'qa-text', html: questionHtml(card) }),
+        card.hint && card.type !== 'cloze' ? el('div', { class: 'qa-hint', text: card.hint }) : null,
+        el('span', { class: 'tap-hint', text: 'Tik om het antwoord te zien' }),
+      ];
+    }
+    return [
+      faceTools('back'),
+      el('span', { class: 'kicker', text: 'Antwoord' }),
+      el('div', { class: 'qa-text', html: answerHtml(card) }),
+      card.note ? el('div', { class: 'qa-note', html: renderMarkup(card.note) }) : null,
+      card.tags?.length ? el('div', { class: 'tag-row' }, card.tags.map((t) => el('span', { class: 'tag', text: t }))) : null,
+    ];
+  }
+
+  /** Tekent één zijde opnieuw, zonder de kaart om te klappen. */
+  function paintFace(side) {
+    const face = stage.querySelector(`.face.${side}`);
+    if (face) appendAll(clear(face), faceContent(side));
+  }
+
   function showCard() {
     revealed = false;
+    editing = false;
+
     session.shownAt = Date.now();
 
     const flip = el('div', { class: 'flip', onclick: () => reveal() }, [
       el('div', { class: 'flip-inner' }, [
-        el('div', { class: 'face front' }, [
-          el('span', { class: 'kicker', text: card.type === 'cloze' ? 'Vul aan' : 'Vraag' }),
-          el('div', { class: 'qa-text', html: questionHtml(card) }),
-          card.hint && card.type !== 'cloze' ? el('div', { class: 'qa-hint', text: card.hint }) : null,
-          el('span', { class: 'tap-hint', text: 'Tik om het antwoord te zien' }),
-        ]),
-        el('div', { class: 'face back' }, [
-          el('span', { class: 'kicker', text: 'Antwoord' }),
-          el('div', { class: 'qa-text', html: answerHtml(card) }),
-          card.note ? el('div', { class: 'qa-note', html: renderMarkup(card.note) }) : null,
-          card.tags?.length ? el('div', { class: 'tag-row' }, card.tags.map((t) => el('span', { class: 'tag', text: t }))) : null,
-        ]),
+        el('div', { class: 'face front' }, faceContent('front')),
+        el('div', { class: 'face back' }, faceContent('back')),
       ]),
     ]);
 
-    const showBtn = el('button', { class: 'btn btn-primary', onclick: () => reveal(), text: 'Toon antwoord' });
+    const showBtn = el('button', { class: 'btn btn-primary reveal-btn', onclick: () => reveal(), text: 'Toon antwoord' });
     clear(stage).append(flip, showBtn);
     stage.dataset.state = 'question';
     updateChrome();
   }
 
+  /**
+   * Bewerken gebeurt in de kaart zelf: de tekst wordt een invoerveld met de
+   * cursor erin. Bij een cloze-kaart bewerken beide zijden dezelfde zin.
+   */
+  function startEdit(side) {
+    if (!card || editing) return;
+    editing = true;
+
+    const face = stage.querySelector(`.face.${side}`);
+    const target = face?.querySelector('.qa-text');
+    if (!target) { editing = false; return; }
+
+    const isCloze = card.type === 'cloze';
+    const current = isCloze ? card.text : side === 'front' ? card.front : card.back;
+
+    const area = el('textarea', { class: 'qa-edit', rows: '3', 'aria-label': 'Tekst van de kaart' });
+    area.value = current;
+
+    // De knop "Toon antwoord" doet tijdens het bewerken niets; laat dat ook zien.
+    const revealBtn = stage.querySelector('.reveal-btn');
+    if (revealBtn) revealBtn.disabled = true;
+
+    const stop = () => {
+      editing = false;
+      if (revealBtn) revealBtn.disabled = false;
+      paintFace('front');
+      paintFace('back');
+    };
+
+    const save = () => {
+      const text = area.value.trim();
+      if (!text) return toast('De tekst mag niet leeg zijn');
+      if (text !== current) {
+        store.updateCard(card.id, isCloze ? { text } : side === 'front' ? { front: text } : { back: text });
+        toast('Opgeslagen');
+      }
+      stop();
+    };
+
+    const editor = el('div', { class: 'qa-editor', onclick: (event) => event.stopPropagation() }, [
+      area,
+      el('div', { class: 'row', style: 'flex-wrap:nowrap;justify-content:center' }, [
+        el('button', { class: 'btn btn-secondary btn-sm', text: 'Annuleren', onclick: stop }),
+        el('button', { class: 'btn btn-primary btn-sm', text: 'Opslaan', onclick: save }),
+      ]),
+      isCloze ? el('span', { class: 'small muted', text: 'Gaten schrijf je als {{c1::antwoord}}' }) : null,
+    ]);
+
+    target.replaceWith(editor);
+    area.focus();
+    area.setSelectionRange(area.value.length, area.value.length);
+
+    area.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') { event.preventDefault(); stop(); }
+      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); save(); }
+    });
+  }
+
+  async function removeCard() {
+    if (!card || editing) return;
+    const ok = await confirmDialog({
+      title: 'Deze kaart verwijderen?',
+      message: cardSummary(card),
+      confirmLabel: 'Verwijderen',
+      danger: true,
+    });
+    if (!ok) return;
+    store.deleteCard(card.id);
+    toast('Kaart verwijderd');
+    next();
+  }
+
   function reveal() {
-    if (!card || revealed) return;
+    if (!card || revealed || editing) return;
     revealed = true;
     stage.querySelector('.flip')?.classList.add('revealed');
     const preview = previewIntervals(card.srs, Date.now(), store.settings.srs);
@@ -213,6 +321,9 @@ export function mount(root, params = {}) {
     } else if (['1', '2', '3', '4'].includes(event.key)) {
       event.preventDefault();
       answer(Number(event.key));
+    } else if (event.key.toLowerCase() === 'e') {
+      event.preventDefault();
+      startEdit(revealed ? 'back' : 'front');
     } else if (event.key.toLowerCase() === 'u') {
       doUndo();
     } else if (event.key === 'Escape') {

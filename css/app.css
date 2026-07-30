@@ -504,11 +504,53 @@ textarea.input {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--space-6) var(--space-5);
+  padding: calc(var(--space-8) + 6px) var(--space-5) var(--space-6);
   text-align: center;
   gap: var(--space-3);
   overflow-y: auto;
 }
+
+/* Bewerken en verwijderen, op elke zijde van de kaart. */
+.face-tools {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+}
+.face-tool {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.face-tool:hover { background: color-mix(in srgb, var(--color-text) 15%, transparent); color: var(--color-text); }
+.face-tool.danger:hover { background: color-mix(in srgb, #a02c2c 18%, transparent); color: #a02c2c; }
+.theme-dark .face-tool.danger:hover { color: #ff9b8a; }
+
+.qa-editor { width: 100%; display: flex; flex-direction: column; gap: var(--space-2); align-items: center; }
+.qa-edit {
+  width: 100%;
+  min-height: 110px;
+  padding: var(--space-3);
+  font-family: var(--font-heading);
+  font-size: 19px;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--color-text);
+  caret-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-bg) 70%, transparent);
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  resize: vertical;
+}
+.qa-edit:focus-visible { outline: none; }
 .face.front { background: var(--color-surface); }
 .face.back { transform: rotateY(180deg); background: var(--color-accent-100); color: var(--color-accent-900); }
 .theme-dark .face.back { color: var(--color-text); }
