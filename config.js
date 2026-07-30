@@ -18,3 +18,6 @@ window.KAARTJES_SUPABASE = {
   url: '',
   anonKey: '',
 };
+
+// Wordt bij het uitrollen overschreven met commit en bouwtijd.
+window.KAARTJES_BUILD = { commit: null, builtAt: null };

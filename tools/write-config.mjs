@@ -26,9 +26,17 @@ function fail(message) {
   process.exit(1);
 }
 
+// Commit en bouwtijd komen van Vercel of GitHub Actions; zo kun je op je
+// toestel zien of je met de laatste uitrol werkt.
+const build = {
+  commit: (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || '').trim() || null,
+  builtAt: Date.now(),
+};
+const buildLine = `window.KAARTJES_BUILD = ${JSON.stringify(build)};\n`;
+
 if (!url && !key) {
   // Toch schrijven: anders levert het script-tagje in index.html een 404 op.
-  writeFileSync(target, 'window.KAARTJES_SUPABASE = { url: "", anonKey: "" };\n', 'utf8');
+  writeFileSync(target, `window.KAARTJES_SUPABASE = { url: "", anonKey: "" };\n${buildLine}`, 'utf8');
   console.log('· SUPABASE_URL/SUPABASE_PUBLISHABLE_KEY niet gezet — config.js blijft leeg (synchroniseren stel je dan in de app in).');
   process.exit(0);
 }
@@ -39,7 +47,8 @@ if (looksSecret(key)) fail(SECRET_KEY_WARNING);
 writeFileSync(
   target,
   `/* Automatisch gegenereerd bij het uitrollen — niet met de hand aanpassen. */\n` +
-  `window.KAARTJES_SUPABASE = ${JSON.stringify({ url, anonKey: key }, null, 2)};\n`,
+  `window.KAARTJES_SUPABASE = ${JSON.stringify({ url, anonKey: key }, null, 2)};\n` +
+  buildLine,
   'utf8'
 );
-console.log(`✓ ${target} geschreven voor ${url}`);
+console.log(`✓ ${target} geschreven voor ${url}${build.commit ? ` (${build.commit.slice(0, 7)})` : ''}`);

@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG } from '../srs.js';
 import { el, toast, confirmDialog, downloadJson, pickFile, plural } from '../ui.js';
 import { refresh } from '../app.js';
 import { syncPanel } from './sync-panel.js';
+import { versionLine } from '../version.js';
 
 function field(label, control, help) {
   return el('label', { class: 'field' }, [
@@ -156,6 +157,25 @@ export function mount(root, params = {}) {
 
     el('h2', { class: 'section-title', text: 'Over' }),
     el('div', { class: 'panel' }, [
+      el('p', { style: 'margin:0 0 var(--space-2);font-weight:700', text: `Kaartjes — ${versionLine()}` }),
+      el('button', {
+        class: 'btn btn-secondary btn-sm',
+        style: 'margin-bottom:var(--space-3)',
+        text: 'Controleer op updates',
+        onclick: async (e) => {
+          const button = e.currentTarget;
+          button.disabled = true;
+          button.textContent = 'Bezig…';
+          try {
+            const registration = await navigator.serviceWorker?.getRegistration();
+            await registration?.update();
+          } catch (err) {
+            console.warn('Bijwerken mislukte', err);
+          }
+          toast('Opnieuw laden…');
+          setTimeout(() => location.reload(), 500);
+        },
+      }),
       el('p', { class: 'small muted', text: `Kaartjes werkt offline. ${isSignedIn() ? 'Je gegevens staan in je eigen Supabase-project, verder nergens.' : 'Er gaat niets naar een server.'} Op je iPhone: deel-knop in Safari → "Zet op beginscherm" voor een echte app-ervaring.` }),
       el('p', { class: 'small muted', text: `Standaard: ${DEFAULT_SETTINGS.newPerDay} nieuwe kaarten en ${DEFAULT_SETTINGS.maxReviewsPerDay} herhalingen per dag.` }),
     ])
