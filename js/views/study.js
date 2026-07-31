@@ -1,7 +1,7 @@
 import { store } from '../store.js';
 import { RATING, previewIntervals } from '../srs.js';
 import { renderMarkup, renderCloze, cardSummary } from '../markup.js';
-import { achievements, achievementTiers, newlyEarned, totalXp, streak, dailyProgress } from '../gamify.js';
+import { achievements, achievementTiers, newlyEarned, totalXp, streak, dailyProgress, levelInfo, XP_DAILY_GOAL } from '../gamify.js';
 import { el, clear, appendAll, toast, confirmDialog } from '../ui.js';
 import { icon } from '../icons.js';
 import { setChrome, navigate } from '../app.js';
@@ -63,8 +63,41 @@ export function mount(root, params = {}) {
   ]);
 
   const stage = el('section', { class: 'study-main' });
+
+  // Je XP moet zichtbaar bewegen terwijl je bezig bent; anders is een niveau
+  // alleen een woord dat je achteraf ergens leest.
+  const levelFill = el('i');
+  const levelText = el('span');
+  const levelStrip = el('a', { class: 'level-strip', href: '#/stats' }, [
+    el('div', { class: 'row', style: 'justify-content:space-between;flex-wrap:nowrap;margin-bottom:5px' }, [
+      el('span', { class: 'small', style: 'font-weight:700', id: 'level-name' }),
+      levelText,
+    ]),
+    el('div', { class: 'bar' }, [levelFill]),
+  ]);
   const hint = el('div', { class: 'kbd-hint', text: 'Spatie = omdraaien · 1-4 = beoordelen · E = bewerken · U = ongedaan maken' });
-  root.append(stage, hint);
+  root.append(stage, levelStrip, hint);
+
+  let level = levelInfo(totalXp(store.stats));
+
+  function paintLevel() {
+    level = levelInfo(totalXp(store.stats));
+    levelStrip.querySelector('#level-name').textContent = `${level.tier} · niveau ${level.level}`;
+    levelText.className = 'small muted';
+    levelText.textContent = `${level.into}/${level.needed} XP`;
+    levelFill.style.width = `${level.progressPct}%`;
+  }
+
+  /**
+   * Kort "+5 XP" dat omhoog zweeft. Hangt bewust in de body: het speelveld
+   * wordt meteen na het antwoord leeggemaakt voor de volgende kaart.
+   */
+  function flashXp(amount, bonus) {
+    const bubble = el('div', { class: 'xp-bubble', text: `+${amount} XP` });
+    document.body.append(bubble);
+    setTimeout(() => bubble.remove(), 1100);
+    if (bonus) toast(`Dagdoel gehaald — bonus van ${XP_DAILY_GOAL} XP`, 3200);
+  }
 
   function questionHtml(c) {
     return c.type === 'cloze' ? renderCloze(c.text, c.clozeIndex, false) : renderMarkup(c.front);
@@ -234,9 +267,16 @@ export function mount(root, params = {}) {
 
   function answer(rating) {
     if (!card || !revealed) return;
-    store.answer(card.id, rating, Date.now(), Date.now() - session.shownAt);
+    const before = level.level;
+    const result = store.answer(card.id, rating, Date.now(), Date.now() - session.shownAt);
     session.answered++;
     if (rating >= RATING.HARD) session.correct++;
+    flashXp(result.xp, result.goalBonus);
+    paintLevel();
+    if (level.level > before) {
+      session.levelUp = { ...level };
+      toast(`Niveau ${level.level} — ${level.tier}`, 3200);
+    }
     next();
   }
 
@@ -247,6 +287,7 @@ export function mount(root, params = {}) {
     card = restored;
     showCard();
     reveal();
+    paintLevel();
     toast('Ongedaan gemaakt');
   }
 
@@ -259,6 +300,7 @@ export function mount(root, params = {}) {
   function finish() {
     updateChrome();
     stage.dataset.state = 'done';
+    levelStrip.style.display = 'none';
     if (session.answered) syncQuietly();
 
     const accuracyPct = session.answered ? Math.round((session.correct / session.answered) * 100) : 0;
@@ -288,6 +330,18 @@ export function mount(root, params = {}) {
             ? `${session.answered} ${session.answered === 1 ? 'kaart' : 'kaarten'} geoefend · +${gainedXp} XP`
             : 'Alle kaarten van deze deck zijn al geleerd of staan gepland voor later.',
         }),
+        session.levelUp
+          ? el('div', { class: 'levelup' }, [
+              el('div', { class: 'levelup-badge', text: String(session.levelUp.level) }),
+              el('div', {}, [
+                el('div', { style: 'font-weight:700;font-size:13px', text: `Niveau ${session.levelUp.level} bereikt` }),
+                el('div', { style: 'font-size:12px;opacity:.85', text: `${session.levelUp.tier} — ${session.levelUp.description || ''}`.trim().replace(/ —$/, '') }),
+              ]),
+            ])
+          : el('div', { style: 'margin-bottom:var(--space-4);text-align:left' }, [
+              el('div', { class: 'small muted', style: 'margin-bottom:6px', text: `${level.tier} · niveau ${level.level} — nog ${level.needed - level.into} XP tot niveau ${level.level + 1}` }),
+              el('div', { class: 'bar' }, [el('i', { style: `width:${level.progressPct}%` })]),
+            ]),
         fresh
           ? el('div', { class: 'unlock' }, [
               icon('medal', 22),
@@ -347,6 +401,7 @@ export function mount(root, params = {}) {
   }
 
   document.addEventListener('keydown', onKey);
+  paintLevel();
   next();
 
   return () => document.removeEventListener('keydown', onKey);

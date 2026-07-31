@@ -46,10 +46,15 @@ export function navigate(hash, { replace = false } = {}) {
   else location.hash = hash;
 }
 
-/** Vervangt de hele kop; views die een eigen kop willen leveren die zelf aan. */
-export function setChrome(...nodes) {
+/**
+ * Vervangt de hele kop. De standaardkop gebruikt een raster (merk, navigatie,
+ * chips, tandwiel); een view die zijn eigen kop levert — zoals het leerscherm —
+ * krijgt een gewone rij, anders belanden die knoppen in de rastervakken.
+ */
+export function setChrome(nodes, { layout = 'row' } = {}) {
+  topbar.className = layout === 'grid' ? 'appbar' : 'appbar appbar-row';
   clear(topbar);
-  for (const node of nodes.flat()) if (node) topbar.append(node);
+  for (const node of [].concat(nodes)) if (node) topbar.append(node);
 }
 
 export function backButton(href = '#/') {
@@ -71,23 +76,26 @@ function streakChip() {
 }
 
 function levelChip() {
-  const { level, tier } = levelInfo(totalXp(store.stats));
+  const { level, tier, into, needed, progressPct } = levelInfo(totalXp(store.stats));
   return el('a', {
-    class: 'chip olive',
+    class: 'chip olive level-chip',
     href: '#/stats',
     style: 'text-decoration:none',
-    title: `Niveau ${level}`,
-  }, [`${tier} · ${level}`]);
+    title: `${tier} · niveau ${level} · nog ${needed - into} XP tot het volgende`,
+  }, [
+    el('i', { class: 'chip-fill', style: `width:${progressPct}%` }),
+    el('span', { text: `${tier} ${level}` }),
+  ]);
 }
 
 function appHeader(route) {
+  // Rasterindeling: het tandwiel staat altijd rechtsboven, waar je het zoekt.
   return [
     el('div', { class: 'brand', text: 'Kaartjes' }),
     el('nav', { class: 'pillnav' },
       TABS.map((tab) => el('a', { href: tab.href, 'aria-current': tab.match(route) ? 'page' : null, text: tab.label }))),
-    streakChip(),
-    levelChip(),
-    el('a', { class: 'round-btn', href: '#/settings', 'aria-label': 'Instellingen' }, [icon('gear', 17)]),
+    el('div', { class: 'appbar-chips' }, [streakChip(), levelChip()]),
+    el('a', { class: 'round-btn appbar-gear', href: '#/settings', 'aria-label': 'Instellingen' }, [icon('gear', 17)]),
   ];
 }
 
@@ -106,7 +114,7 @@ function render() {
   viewRoot.className = 'view';
   window.scrollTo(0, 0);
   topbar.hidden = route.name === 'auth';
-  if (!topbar.hidden) setChrome(appHeader(route));
+  if (!topbar.hidden) setChrome(appHeader(route), { layout: 'grid' });
   try {
     cleanup = ROUTES[route.name].mount(viewRoot, route.params) || null;
   } catch (err) {

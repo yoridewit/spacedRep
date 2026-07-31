@@ -164,8 +164,15 @@ om makkelijke kaarten te malen — precies de bekendste kritiek op dit soort
 systemen.
 
 **Niveaus** — elk niveau kost 50 × het niveaunummer aan XP, dus ze worden
-steeds duurder. Elke fase heeft een naam: Zaadje, Spruit, Struik, Boom, Woud,
-Oerbos. Je ziet altijd hoeveel XP je nog van het volgende niveau af bent.
+steeds duurder. Elke fase heeft een naam en een betekenis: Zaadje (niveau 1-4),
+Spruit (5-9), Struik (10-19), Boom (20-34), Woud (35-49), Oerbos (50 en verder).
+De hele ladder staat bij je statistiek, met de fase waar je nu in zit
+gemarkeerd — een naam zonder context zegt niets.
+
+Je XP moet je vooral *zien bewegen*: onder de kaart loopt tijdens het overhoren
+een balk met je niveau en je stand, bij elk antwoord zweeft er kort een "+5 XP"
+omhoog, en de chip in de kop loopt zichtbaar vol. Ga je over een niveau heen,
+dan komt dat meteen voorbij als melding en groot in de samenvatting.
 
 **Dagdoel** — standaard 20 kaarten, in te stellen. Haal je het, dan is er een
 bonus van 10 XP. De balk staat op je startscherm en als ring bij je statistiek:

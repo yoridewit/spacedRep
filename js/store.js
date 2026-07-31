@@ -412,7 +412,7 @@ class Store extends EventTarget {
     if (this.undoStack.length > MAX_UNDO) this.undoStack.shift();
 
     this.changed({ type: 'answer', cardId });
-    return next;
+    return { srs: next, xp, goalBonus };
   }
 
   canUndo() {

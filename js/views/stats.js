@@ -1,7 +1,7 @@
 import { store } from '../store.js';
 import {
   totalXp, levelInfo, streak, calendar, weekly, achievements, mastery, accuracy,
-  dailyProgress, freezesAvailable, MAX_FREEZES,
+  dailyProgress, freezesAvailable, tierLadder, MAX_FREEZES,
 } from '../gamify.js';
 import { el, appendAll, plural } from '../ui.js';
 import { icon } from '../icons.js';
@@ -111,12 +111,31 @@ export function mount(root) {
       el('div', { class: 'level-ring', title: `Niveau ${level.level}` }, [String(level.level)]),
       el('div', { class: 'grow', style: 'min-width:180px' }, [
         el('div', { style: 'font-size:16px;font-family:var(--font-heading)', text: level.tier }),
+        el('div', { class: 'small muted', style: 'margin-bottom:2px', text: level.description }),
         el('div', { class: 'small muted', style: 'margin-bottom:6px', text: `Niveau ${level.level} · ${xp} XP` }),
         el('div', { class: 'bar tall' }, [el('i', { style: `width:${level.progressPct}%` })]),
         el('div', { class: 'small muted', style: 'margin-top:6px', text: level.nextTier
           ? `Nog ${level.needed - level.into} XP tot niveau ${level.level + 1} · ${level.nextTier.name} vanaf niveau ${level.nextTier.from}`
           : `Nog ${level.needed - level.into} XP tot niveau ${level.level + 1}` }),
       ]),
+    ]),
+
+    el('div', { class: 'panel' }, [
+      el('h4', { text: 'De ladder' }),
+      el('p', { class: 'small muted', style: 'margin-top:0', text: 'Elk niveau kost meer XP dan het vorige. Waar je nu staat:' }),
+      el('div', { class: 'ladder' },
+        tierLadder(level.level).map((tier) =>
+          el('div', { class: `rung ${tier.current ? 'current' : ''} ${tier.reached ? 'reached' : ''}` }, [
+            el('div', { class: 'rung-dot' }),
+            el('div', { class: 'grow' }, [
+              el('div', { style: 'font-family:var(--font-heading);font-size:15px' }, [
+                tier.name,
+                el('span', { class: 'small muted', text: `  niveau ${tier.from}${tier.to ? `–${tier.to}` : ' en verder'}` }),
+              ]),
+              el('div', { class: 'small muted', text: tier.description }),
+            ]),
+            tier.current ? el('span', { class: 'badge-pill due', text: 'nu' }) : null,
+          ]))),
     ]),
 
     el('div', { class: 'panel', style: 'display:flex;gap:var(--space-4);align-items:center;flex-wrap:wrap' }, [

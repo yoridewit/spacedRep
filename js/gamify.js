@@ -54,18 +54,31 @@ export function totalXp(stats) {
 
 // ── niveaus ──────────────────────────────────────────────────────────────
 
-const TIERS = [
-  { from: 1, name: 'Zaadje' },
-  { from: 5, name: 'Spruit' },
-  { from: 10, name: 'Struik' },
-  { from: 20, name: 'Boom' },
-  { from: 35, name: 'Woud' },
-  { from: 50, name: 'Oerbos' },
+export const TIERS = [
+  { from: 1, name: 'Zaadje', description: 'Je eerste kaarten' },
+  { from: 5, name: 'Spruit', description: 'Het begint te lopen' },
+  { from: 10, name: 'Struik', description: 'Je hebt er een gewoonte van gemaakt' },
+  { from: 20, name: 'Boom', description: 'Stevig geworteld' },
+  { from: 35, name: 'Woud', description: 'Een heel bos aan kennis' },
+  { from: 50, name: 'Oerbos', description: 'Zeldzaam gebied' },
 ];
 
 /** Wat niveau `level` kost om te halen. Elk niveau wordt iets duurder. */
 export function xpToNext(level) {
   return 50 * Math.max(1, level);
+}
+
+/** De hele ladder, met de fase waar je nu in zit gemarkeerd. */
+export function tierLadder(level) {
+  return TIERS.map((tier, index) => {
+    const next = TIERS[index + 1];
+    return {
+      ...tier,
+      to: next ? next.from - 1 : null,
+      current: level >= tier.from && (!next || level < next.from),
+      reached: level >= tier.from,
+    };
+  });
 }
 
 export function tierFor(level) {
@@ -93,6 +106,7 @@ export function levelInfo(xp) {
     needed,
     progressPct: Math.round((rest / needed) * 100),
     tier: tierFor(level).name,
+    description: tierFor(level).description,
     nextTier: nextTierFor(level),
   };
 }

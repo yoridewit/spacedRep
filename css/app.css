@@ -194,6 +194,10 @@ a { color: var(--color-accent-700); text-underline-offset: 3px; }
 
 @media (min-width: 700px) {
   .view { padding-inline: var(--space-6); }
+  .appbar {
+    grid-template-columns: auto auto 1fr auto;
+    grid-template-areas: "brand nav chips gear";
+  }
 }
 
 /* ── kop ───────────────────────────────────────────────────────────────── */
@@ -202,26 +206,48 @@ a { color: var(--color-accent-700); text-underline-offset: 3px; }
   position: sticky;
   top: 0;
   z-index: 20;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas:
+    "brand chips gear"
+    "nav   nav   nav";
   align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
   padding: calc(var(--safe-top) + var(--space-3)) var(--space-4) var(--space-3);
   background: color-mix(in srgb, var(--color-bg) 90%, transparent);
   backdrop-filter: saturate(150%) blur(12px);
   -webkit-backdrop-filter: saturate(150%) blur(12px);
 }
 
+/* Eigen kop van een view: gewoon een rij. */
+.appbar.appbar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  grid-template-areas: none;
+}
+
 .brand {
+  grid-area: brand;
   font-family: var(--font-heading);
   font-size: 22px;
   line-height: 1;
 }
 
+.appbar-chips {
+  grid-area: chips;
+  justify-self: end;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+.appbar-gear { grid-area: gear; }
+
 .pillnav {
+  grid-area: nav;
   display: flex;
   gap: var(--space-1);
-  margin-right: auto;
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -252,6 +278,17 @@ a { color: var(--color-accent-700); text-underline-offset: 3px; }
   color: var(--color-accent-800);
 }
 .chip.olive { background: var(--color-accent-2-100); color: var(--color-accent-2-800); }
+
+/* De niveauchip loopt zichtbaar vol naar het volgende niveau. */
+.level-chip { position: relative; overflow: hidden; }
+.level-chip .chip-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  background: color-mix(in srgb, var(--color-accent-2-500) 45%, transparent);
+  transition: width .4s ease;
+}
+.level-chip span { position: relative; }
 .chip svg { display: block; }
 .chip.flame svg { animation: flame-pulse 2.2s ease-in-out infinite; }
 
@@ -631,6 +668,68 @@ textarea.input {
   white-space: nowrap;
 }
 
+/* Zichtbare XP tijdens het overhoren. */
+.level-strip {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+}
+.level-strip .bar > i { transition: width .45s cubic-bezier(.3, 1.4, .5, 1); }
+
+.xp-bubble {
+  position: fixed;
+  left: 50%;
+  top: 34%;
+  transform: translateX(-50%);
+  font-family: var(--font-heading);
+  font-size: 22px;
+  color: var(--color-accent-2-700);
+  pointer-events: none;
+  animation: xp-float 1.1s ease-out forwards;
+  z-index: 5;
+}
+.theme-dark .xp-bubble { color: var(--color-accent-2-700); }
+
+@keyframes xp-float {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(.8); }
+  25% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%, -60px) scale(1); }
+}
+
+.study-main { position: relative; }
+
+.levelup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-accent-100);
+  color: var(--color-accent-900);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-4);
+  text-align: left;
+  animation: pop-in .35s ease;
+}
+.theme-dark .levelup { color: var(--color-text); }
+.levelup-badge {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 19px;
+}
+
 /* ── samenvatting ──────────────────────────────────────────────────────── */
 
 .summary {
@@ -723,6 +822,28 @@ textarea.input {
 }
 
 .level-panel { display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap; }
+
+.ladder { display: flex; flex-direction: column; gap: 2px; }
+.rung {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius-md);
+  opacity: .55;
+}
+.rung.reached { opacity: 1; }
+.rung.current { background: color-mix(in srgb, var(--color-accent) 12%, transparent); opacity: 1; }
+.rung-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--color-neutral-300);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-neutral-300) 35%, transparent);
+}
+.rung.reached .rung-dot { background: var(--color-accent-2-500); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent-2-500) 30%, transparent); }
+.rung.current .rung-dot { background: var(--color-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 30%, transparent); }
 
 .goal-ring { position: relative; width: 92px; height: 92px; flex: none; }
 .goal-ring .ring-svg { position: absolute; inset: 0; }
