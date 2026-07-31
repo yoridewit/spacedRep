@@ -15,6 +15,7 @@ import {
 import { mergeStates, contentKey } from '../js/merge.js';
 import { dayTotal, mergeDay, normalizeDay } from '../js/daystats.js';
 import { looksSecret } from '../js/keycheck.js';
+import { buildPrompt, suggestCardRange, countWords } from '../js/prompt.js';
 
 let passed = 0;
 const failures = [];
@@ -520,6 +521,51 @@ test('samenvoegen is idempotent', () => {
   eq(Object.keys(twice.decks).length, 1);
 });
 
+
+// ── de opdracht voor de AI ───────────────────────────────────────────────
+
+test('het aantal kaarten volgt de hoeveelheid stof', () => {
+  eq(countWords('een korte zin met zes woorden'), 6);
+  const alinea = suggestCardRange('woord '.repeat(80));
+  assert(alinea.max <= 8, `één alinea levert een handvol kaarten (${alinea.min}-${alinea.max})`);
+  assert(alinea.min >= 3, 'maar nooit minder dan drie');
+  const hoofdstuk = suggestCardRange('woord '.repeat(1200));
+  assert(hoofdstuk.min > alinea.max, 'een hoofdstuk levert er duidelijk meer op');
+  assert(hoofdstuk.max <= 60, 'met een plafond');
+  const leeg = suggestCardRange('');
+  eq([leeg.min, leeg.max], [12, 20], 'zonder stof een gewone reeks');
+});
+
+test('de opdracht bevat de regels die ertoe doen', () => {
+  const prompt = buildPrompt({ topic: 'woord '.repeat(100) });
+  for (const zin of ['Eén feit per kaart', 'Geen opsommingen', '{{c1::', 'maar één antwoord op past', 'Voorkom verwarring', 'waarom- of hoe-vraag']) {
+    assert(prompt.includes(zin), `mist "${zin}"`);
+  }
+  assert(/Maak \d+ tot \d+ flashcards/.test(prompt), 'noemt een bereik');
+  assert(prompt.includes('Verzin niets bij'), 'waarschuwt tegen verzinnen');
+});
+
+test('bestaande kaarten gaan mee zodat je geen dubbele krijgt', () => {
+  const zonder = buildPrompt({ topic: 'stof' });
+  assert(!zonder.includes('STAAT ER AL IN'), 'zonder deck geen lijst');
+
+  const met = buildPrompt({
+    topic: 'stof',
+    deckName: 'Biologie',
+    existing: ['Wat is DNA?', 'Wat is RNA?'],
+  });
+  assert(met.includes('STAAT ER AL IN'), 'met deck wel');
+  assert(met.includes('- Wat is DNA?'), 'de vragen staan erin');
+  assert(met.includes('"Biologie"'), 'en de decknaam');
+
+  const veel = buildPrompt({ topic: 'stof', existing: Array.from({ length: 120 }, (_, i) => `Vraag ${i}`) });
+  assert(veel.includes('en nog 40 andere'), 'lange lijsten worden afgekapt');
+});
+
+test('een vast aantal overschrijft de schatting', () => {
+  const prompt = buildPrompt({ topic: 'woord '.repeat(1000), min: 8, max: 12 });
+  assert(prompt.includes('Maak 8 tot 12 flashcards'), 'gebruikt de opgegeven grenzen');
+});
 
 // ── sleutels ─────────────────────────────────────────────────────────────
 

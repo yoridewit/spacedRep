@@ -1,7 +1,7 @@
 import { store } from '../store.js';
 import { parseImport, ParseError } from '../parse.js';
 import { cardSummary, cardAnswerSummary } from '../markup.js';
-import { buildPrompt } from '../prompt.js';
+import { buildPrompt, suggestCardRange, countWords } from '../prompt.js';
 import { el, clear, toast, copyToClipboard, pickFile, decodeShare, plural } from '../ui.js';
 import { navigate } from '../app.js';
 
@@ -20,15 +20,60 @@ export function mount(root, params = {}) {
     placeholder: 'Plak hier je lesstof, of typ het onderwerp (bijvoorbeeld "hoofdstuk 3, celdeling")',
     style: 'min-height:110px;font-family:var(--font-body);font-size:16px',
   });
-  const countInput = el('input', { class: 'input', type: 'number', min: '5', max: '100', step: '5' });
-  countInput.value = '25';
-  const promptBox = el('textarea', { class: 'input', readonly: true, style: 'min-height:170px;display:none' });
+
+  // Waar het heen gaat, meteen bovenaan: bij een bestaande deck krijgt de AI de
+  // vragen die er al in staan mee, zodat je geen dubbele kaarten terugkrijgt.
+  const deckSelect = el('select', { class: 'input' }, [
+    el('option', { value: '', text: 'Nieuwe deck' }),
+    ...store.listDecks().map((d) => el('option', { value: d.id, text: `${d.name} (${store.deckCards(d.id).length})` })),
+  ]);
+
+  const amountSelect = el('select', { class: 'input' }, [
+    el('option', { value: 'auto', text: 'Automatisch — past zich aan je stof aan' }),
+    ...[5, 10, 15, 20, 30, 50].map((n) => el('option', { value: String(n), text: `Ongeveer ${n} kaarten` })),
+  ]);
+
+  const amountHint = el('span', { class: 'help' });
+  const promptBox = el('textarea', { class: 'input', readonly: true, style: 'min-height:180px;display:none' });
+
+  function chosenDeck() {
+    return deckSelect.value ? store.getDeck(deckSelect.value) : null;
+  }
+
+  function promptOptions() {
+    const deck = chosenDeck();
+    const range = suggestCardRange(topicInput.value);
+    const fixed = amountSelect.value === 'auto' ? null : Number(amountSelect.value);
+    return {
+      topic: topicInput.value,
+      min: fixed ? Math.max(3, Math.round(fixed * 0.8)) : range.min,
+      max: fixed ? Math.round(fixed * 1.2) : range.max,
+      deckName: deck?.name || '',
+      existing: deck ? store.deckCards(deck.id).map((c) => cardSummary(c)) : [],
+    };
+  }
 
   const refreshPrompt = () => {
-    promptBox.value = buildPrompt({ topic: topicInput.value, count: Number(countInput.value) || 25 });
+    const options = promptOptions();
+    promptBox.value = buildPrompt(options);
+
+    const words = countWords(topicInput.value);
+    const deck = chosenDeck();
+    const parts = [];
+    if (amountSelect.value === 'auto') {
+      parts.push(words
+        ? `${words} woorden stof — de opdracht vraagt om ${options.min} tot ${options.max} kaarten.`
+        : 'Nog geen stof geplakt; de opdracht vraagt voorlopig om 12 tot 20 kaarten.');
+    } else {
+      parts.push(`De opdracht vraagt om ${options.min} tot ${options.max} kaarten.`);
+    }
+    if (deck) parts.push(`De ${options.existing.length} vragen die al in "${deck.name}" staan gaan mee, zodat je geen dubbele krijgt.`);
+    amountHint.textContent = parts.join(' ');
   };
+
   topicInput.addEventListener('input', refreshPrompt);
-  countInput.addEventListener('input', refreshPrompt);
+  amountSelect.addEventListener('change', refreshPrompt);
+  deckSelect.addEventListener('change', refreshPrompt);
   refreshPrompt();
 
   // ── 2. het antwoord terugplakken ──
@@ -50,8 +95,13 @@ export function mount(root, params = {}) {
         el('span', { class: 'help', text: 'Mag leeg blijven — dan zet je de stof zelf onder de opdracht in je AI-gesprek.' }),
       ]),
       el('label', { class: 'field' }, [
+        el('span', { class: 'label', text: 'Waar komen de kaarten?' }),
+        deckSelect,
+      ]),
+      el('label', { class: 'field' }, [
         el('span', { class: 'label', text: 'Aantal kaarten' }),
-        countInput,
+        amountSelect,
+        amountHint,
       ]),
       el('div', { class: 'row' }, [
         el('button', {
@@ -137,7 +187,8 @@ export function mount(root, params = {}) {
       el('option', { value: '', text: 'Nieuwe deck' }),
       ...store.listDecks().map((d) => el('option', { value: d.id, text: `${d.name} (${store.deckCards(d.id).length})` })),
     ]);
-    const existing = single ? store.findDeckByName(parsed.decks[0].name) : null;
+    const preselected = deckSelect.value && store.getDeck(deckSelect.value);
+    const existing = preselected || (single ? store.findDeckByName(parsed.decks[0].name) : null);
     if (existing) targetSelect.value = existing.id;
 
     const nameField = el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Naam' }), nameInput]);

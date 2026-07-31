@@ -8,47 +8,36 @@ eigen onderwerp er al in verwerkt.
 
 ## De opdracht
 
-> Je maakt flashcards voor spaced repetition (Anki-stijl).
->
-> **LESSTOF:**
-> *[plak hier je hoofdstuk, aantekeningen of samenvatting]*
->
-> **OPDRACHT:**
-> Maak ongeveer 25 flashcards over deze stof, in het Nederlands.
->
-> **REGELS:**
-> 1. Eén feit per kaart. Geen samengestelde vragen ("en", "ook", opsommingen van 5 dingen).
-> 2. De voorkant is een concrete vraag of een begrip; de achterkant is het kortst mogelijke juiste antwoord.
-> 3. Geen ja/nee-vragen en geen vragen die je kunt raden uit de vraag zelf.
-> 4. Gebruik de woorden uit de stof; verzin niets bij wat er niet staat.
-> 5. Voor definities, jaartallen, formules en lijstjes: gebruik cloze-kaarten met `{{c1::...}}`.
->    Meerdere gaten in één zin mag: `{{c1::...}}` en `{{c2::...}}` worden aparte kaarten.
-> 6. Maximaal ~200 tekens per kant. Langere toelichting hoort in `note`.
-> 7. Zet bij elke kaart 1-2 tags (bijvoorbeeld het hoofdstuk of subonderwerp).
->
-> **UITVOER:**
-> Geef uitsluitend geldige JSON terug in exact dit formaat, zonder tekst eromheen:
->
-> ```json
-> {
->   "deck": "Naam van het onderwerp",
->   "description": "Korte omschrijving (optioneel)",
->   "cards": [
->     {
->       "front": "Vraag of begrip",
->       "back": "Het antwoord, kort en concreet",
->       "hint": "Optionele tip",
->       "note": "Optionele extra uitleg, pas zichtbaar na het antwoord",
->       "tags": ["hoofdstuk-1"]
->     },
->     {
->       "type": "cloze",
->       "text": "De mitochondriën zijn de {{c1::energiefabriek}} van de {{c2::cel}}.",
->       "tags": ["biologie"]
->     }
->   ]
-> }
-> ```
+De app stelt hem voor je samen. Twee dingen passen zich aan:
+
+- **Het aantal kaarten volgt de hoeveelheid stof.** Eén alinea van 70 woorden
+  levert een vraag om 3 tot 5 kaarten op, een hoofdstuk van 900 woorden om 20
+  tot 50. Je kunt het ook vastzetten op ongeveer een aantal naar keuze.
+- **Kies je een bestaande deck**, dan gaan de vragen die er al in staan mee in
+  de opdracht, met het verzoek er geen dubbele van te maken. Zo vul je een deck
+  aan in plaats van hem te verdubbelen.
+
+De regels in de opdracht komen uit Wozniak's *Twenty Rules of Formulating
+Knowledge* — de standaard voor het schrijven van flashcards — aangevuld met de
+bevinding van Dunlosky e.a. (2013) dat doorvragen ("waarom is dat zo?") boven
+losse feiten uitkomt:
+
+1. **Eén feit per kaart**, met het kortst mogelijke antwoord (het
+   minimum-informatieprincipe). Moet je een zin antwoorden, dan moet de kaart
+   gesplitst worden.
+2. **Geen opsommingen** en geen "noem de vijf …": lijsten worden losse kaarten
+   of cloze-kaarten waarin telkens één element wegvalt.
+3. **Cloze** voor definities, jaartallen, formules en vaste uitdrukkingen.
+4. **Eén mogelijk antwoord** per vraag; geen ja/nee, niets waarvan het antwoord
+   al in de vraag zit.
+5. **Interferentie bestrijden**: bij kaarten die op elkaar lijken hoort het
+   onderscheidende kenmerk of de context in de vraag.
+6. **Waarom- en hoe-vragen** naast wat-vragen.
+7. **Redundantie mag**: dezelfde kern van een andere kant benaderen helpt, een
+   letterlijk identieke vraag niet.
+8. Kort en concreet, ongeveer 200 tekens per kant; bronnen en jaartallen in
+   `note`.
+9. Eén of twee tags per kaart.
 
 ## Velden
 

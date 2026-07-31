@@ -5,7 +5,9 @@ iPhone te draaien én op je pc te gebruiken om kaarten toe te voegen.
 
 - **AI maakt de kaarten.** Je laat een externe AI je lesstof omzetten naar een
   vast JSON-formaat en plakt dat in de app. De app hoeft zelf geen AI aan te
-  roepen — er is dus geen API-sleutel en geen account nodig.
+  roepen — er is dus geen API-sleutel en geen account nodig. De opdracht die je
+  meekrijgt is gebouwd op Wozniak's twintig regels voor het formuleren van
+  kennis, en past het aantal kaarten aan op de hoeveelheid stof.
 - **Anki-achtig leren.** SM-2-planner met leerstappen, ease-factor, herleren na
   fouten en daglimieten voor nieuwe kaarten en herhalingen.
 - **Werkt offline.** Alles staat in je eigen browser; geen server nodig.
