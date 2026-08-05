@@ -330,14 +330,19 @@ test('een vriezer wordt alleen op gisteren ingezet, en alleen met een reeks', ()
   eq(freezeToApply(geenReeks, {}, NOW, 4), null, 'er was geen reeks om te redden');
 });
 
-test('beheersing weegt rijpe kaarten vol en jonge half', () => {
+test('beheersing weegt rijpe kaarten vol en jonge naar rato van hun interval', () => {
   const cards = [
     { srs: { state: 'review', interval: 30 } },
     { srs: { state: 'review', interval: 5 } },
     { srs: { state: 'new', interval: 0 } },
     { srs: { state: 'new', interval: 0 } },
   ];
-  eq(mastery(cards), 38);
+  eq(mastery(cards), 40);
+  // Net gegradueerd (interval 1) begint rond de helft, en groeit gestaag naar
+  // 100% bij het rijp worden — geen vlakke 50% voor elk niet-rijp interval.
+  const growing = [{ srs: { state: 'review', interval: 1 } }];
+  const almostMature = [{ srs: { state: 'review', interval: 18 } }];
+  assert(mastery(growing) < mastery(almostMature), 'krediet loopt op met het interval');
   eq(mastery([]), 0);
 });
 

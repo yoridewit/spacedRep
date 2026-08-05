@@ -170,11 +170,14 @@ store.addEventListener('change', (e) => {
   if (['settings', 'restore', 'wipe'].includes(e.detail?.type)) applyTheme();
 });
 store.addEventListener('storage-error', (e) => toast(e.detail, 5000));
+// Schermen zonder eigen invoer mogen na een achtergrond-sync gerust opnieuw
+// getekend worden; overal waar je middenin een leersessie of formulier zit
+// (toevoegen, deck bewerken, instellingen) zou dat je invoer wegvegen.
+const SAFE_TO_REFRESH_ON_SYNC = new Set(['home', 'stats']);
+
 store.addEventListener('change', (e) => {
   if (e.detail?.type === 'sync') {
-    // Na een merge van een ander apparaat de tellers verversen — maar niet
-    // midden in een leersessie, dan zou de kaart onder je handen verdwijnen.
-    if (current?.name !== 'study') refresh();
+    if (current && SAFE_TO_REFRESH_ON_SYNC.has(current.name)) refresh();
     return;
   }
   scheduleSync();

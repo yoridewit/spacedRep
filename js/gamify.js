@@ -172,14 +172,18 @@ export function accuracy(day) {
   return Math.round(((total.reviews - total.again) / total.reviews) * 100);
 }
 
-/** Percentage van een deck dat "onder de knie" is: rijp telt vol, jong half. */
+/**
+ * Percentage van een deck dat "onder de knie" is: rijp telt vol, en tussen het
+ * afstuderen uit de leerfase en rijp worden loopt het krediet geleidelijk op
+ * (anders staat de balk weken lang vast op precies 50%, wat lijkt op een fout).
+ */
 export function mastery(cards) {
   if (!cards.length) return 0;
   let score = 0;
   for (const card of cards) {
     const s = card.srs;
     if (s.state !== 'review') continue;
-    score += s.interval >= MATURE_DAYS ? 1 : 0.5;
+    score += s.interval >= MATURE_DAYS ? 1 : 0.5 + 0.5 * Math.min(1, s.interval / MATURE_DAYS);
   }
   return Math.round((score / cards.length) * 100);
 }
