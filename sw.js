@@ -11,7 +11,7 @@
  * zonder verbinding start.
  */
 
-const CACHE = 'kaartjes-v13';
+const CACHE = 'kaartjes-v14';
 const SHELL = [
   './',
   'index.html',

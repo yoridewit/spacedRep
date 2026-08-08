@@ -37,7 +37,6 @@ export function mount(root, params = {}) {
   let card = null;
   let revealed = false;
   let editing = false;
-  let peekBtn = null;
 
   function achievementInput() {
     return {
@@ -262,22 +261,18 @@ export function mount(root, params = {}) {
           el('span', { text: g.label }),
           el('small', { text: preview[g.rating] }),
         ])));
-    peekBtn = el('button', { class: 'btn btn-secondary btn-sm peek-btn', onclick: peekFlip }, [icon('flip', 14), ' Nog eens bekijken']);
-    const peekRow = el('div', { class: 'row', style: 'justify-content:center;margin-bottom:var(--space-2)' }, [peekBtn]);
-    stage.lastElementChild.replaceWith(peekRow, grades);
+    stage.lastElementChild.replaceWith(grades);
     stage.dataset.state = 'answer';
   }
 
   /**
    * Zolang je nog niet hebt beoordeeld mag je terugklappen naar de vraag om
-   * hem nog eens te lezen — dat telt niet mee als beoordelen.
+   * hem nog eens te lezen — dat telt niet mee als beoordelen. Tik nogmaals op
+   * de kaart (of Backspace) om weer naar het antwoord te gaan.
    */
   function peekFlip() {
     if (!card || !revealed || editing) return;
-    const flip = stage.querySelector('.flip');
-    if (!flip) return;
-    const showingBack = flip.classList.toggle('revealed');
-    if (peekBtn) appendAll(clear(peekBtn), icon('flip', 14), showingBack ? ' Nog eens bekijken' : ' Terug naar het antwoord');
+    stage.querySelector('.flip')?.classList.toggle('revealed');
   }
 
   function answer(rating) {
