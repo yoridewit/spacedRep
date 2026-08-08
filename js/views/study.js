@@ -37,6 +37,7 @@ export function mount(root, params = {}) {
   let card = null;
   let revealed = false;
   let editing = false;
+  let peekBtn = null;
 
   function achievementInput() {
     return {
@@ -75,7 +76,7 @@ export function mount(root, params = {}) {
     ]),
     el('div', { class: 'bar' }, [levelFill]),
   ]);
-  const hint = el('div', { class: 'kbd-hint', text: 'Spatie = omdraaien · 1-4 = beoordelen · E = bewerken · U = ongedaan maken' });
+  const hint = el('div', { class: 'kbd-hint', text: 'Spatie = omdraaien · 1-4 = beoordelen · Backspace = nog eens bekijken · E = bewerken · U = ongedaan maken' });
   root.append(stage, levelStrip, hint);
 
   let level = levelInfo(totalXp(store.stats));
@@ -165,7 +166,7 @@ export function mount(root, params = {}) {
 
     session.shownAt = Date.now();
 
-    const flip = el('div', { class: 'flip', onclick: () => reveal() }, [
+    const flip = el('div', { class: 'flip', onclick: () => (revealed ? peekFlip() : reveal()) }, [
       el('div', { class: 'flip-inner' }, [
         el('div', { class: 'face front' }, faceContent('front')),
         el('div', { class: 'face back' }, faceContent('back')),
@@ -261,8 +262,22 @@ export function mount(root, params = {}) {
           el('span', { text: g.label }),
           el('small', { text: preview[g.rating] }),
         ])));
-    stage.lastElementChild.replaceWith(grades);
+    peekBtn = el('button', { class: 'btn btn-secondary btn-sm peek-btn', onclick: peekFlip }, [icon('flip', 14), ' Nog eens bekijken']);
+    const peekRow = el('div', { class: 'row', style: 'justify-content:center;margin-bottom:var(--space-2)' }, [peekBtn]);
+    stage.lastElementChild.replaceWith(peekRow, grades);
     stage.dataset.state = 'answer';
+  }
+
+  /**
+   * Zolang je nog niet hebt beoordeeld mag je terugklappen naar de vraag om
+   * hem nog eens te lezen — dat telt niet mee als beoordelen.
+   */
+  function peekFlip() {
+    if (!card || !revealed || editing) return;
+    const flip = stage.querySelector('.flip');
+    if (!flip) return;
+    const showingBack = flip.classList.toggle('revealed');
+    if (peekBtn) appendAll(clear(peekBtn), icon('flip', 14), showingBack ? ' Nog eens bekijken' : ' Terug naar het antwoord');
   }
 
   function answer(rating) {
@@ -390,9 +405,12 @@ export function mount(root, params = {}) {
     } else if (['1', '2', '3', '4'].includes(event.key)) {
       event.preventDefault();
       answer(Number(event.key));
+    } else if (event.key === 'Backspace') {
+      event.preventDefault();
+      peekFlip();
     } else if (event.key.toLowerCase() === 'e') {
       event.preventDefault();
-      startEdit(revealed ? 'back' : 'front');
+      startEdit(stage.querySelector('.flip')?.classList.contains('revealed') ? 'back' : 'front');
     } else if (event.key.toLowerCase() === 'u') {
       doUndo();
     } else if (event.key === 'Escape') {
