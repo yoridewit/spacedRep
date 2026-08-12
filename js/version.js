@@ -4,7 +4,7 @@
  * uitrol config.js genereert (zie tools/write-config.mjs).
  */
 
-export const APP_VERSION = '1.12.0';
+export const APP_VERSION = '1.12.1';
 
 export function buildInfo() {
   const build = globalThis.KAARTJES_BUILD || {};

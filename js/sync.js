@@ -151,13 +151,20 @@ function authMessage(status, data) {
   return data?.error_description || data?.msg || data?.message || `Aanmelden mislukte (${status}).`;
 }
 
+/**
+ * Ná een token-ververs stuurt Supabase niet altijd het volledige
+ * gebruikersobject mee terug. Zonder fallback zou dat email/user_id stilletjes
+ * op null zetten — en user_id zit in het pad van elke foto in Storage, dus
+ * dat zou al je afbeeldingen op dat toestel onvindbaar maken.
+ */
 function storeSession(data) {
+  const previous = getSession();
   setSession({
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_at: Date.now() + (data.expires_in || 3600) * 1000,
-    email: data.user?.email || null,
-    user_id: data.user?.id || null,
+    email: data.user?.email || previous?.email || null,
+    user_id: data.user?.id || previous?.user_id || null,
   });
 }
 

@@ -225,8 +225,11 @@ async function downloadRemote(id) {
     const res = await storageFetch(id);
     if (res.ok) return { blob: await res.blob(), error: null };
     const body = await res.text().catch(() => '');
-    console.warn('Afbeelding ophalen mislukt', res.status, body);
-    return { blob: null, error: describeError(res.status, body) };
+    console.warn('Afbeelding ophalen mislukt', res.status, body, objectPath(id));
+    // Het pad erbij: vergelijk dit met wat je in het Supabase-dashboard onder
+    // Storage → card-images ziet staan — dat wijst meteen uit of het toestel
+    // een ander pad zoekt dan waar de foto daadwerkelijk staat.
+    return { blob: null, error: `${describeError(res.status, body)} — pad: ${objectPath(id)}` };
   } catch (err) {
     return { blob: null, error: `netwerkfout: ${err.message}` };
   }
