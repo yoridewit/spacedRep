@@ -144,11 +144,11 @@ export function mount(root, params = {}) {
   function imageEl(id) {
     if (!id) return null;
     const img = el('img', { class: 'qa-image', alt: '' });
-    images.imageUrl(id).then((url) => {
+    images.imageUrl(id).then(({ url, error }) => {
       if (url) img.src = url;
       // Nog niet op dit toestel, en het ophalen van een ander apparaat lukte
       // niet — dat wil je zien in plaats van dat de foto stil verdwijnt.
-      else img.replaceWith(el('div', { class: 'qa-image-missing small muted', text: 'Afbeelding kon niet geladen worden' }));
+      else img.replaceWith(el('div', { class: 'qa-image-missing small muted', text: `Afbeelding kon niet geladen worden${error ? ` (${error})` : ''}` }));
     });
     return img;
   }

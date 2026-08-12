@@ -103,17 +103,22 @@ export async function deleteImage(id) {
 
 const urlCache = new Map();
 
-/** Geeft een tijdelijke URL om de afbeelding te tonen; haalt hem zo nodig op van de server. */
+/**
+ * Geeft een tijdelijke URL om de afbeelding te tonen; haalt hem zo nodig op
+ * van de server. Bij falen komt er ook een korte reden mee (voor de
+ * placeholder in beeld — "waarom" is hier belangrijker dan overal elders,
+ * want een foto die stil wegvalt is niet te diagnosticeren op je telefoon).
+ */
 export async function imageUrl(id) {
-  if (!id) return null;
-  if (urlCache.has(id)) return urlCache.get(id);
-  let blob = await idbGet(id).catch(() => null);
-  if (!blob) blob = await downloadRemote(id);
-  if (!blob) return null;
+  if (!id) return { url: null, error: null };
+  if (urlCache.has(id)) return { url: urlCache.get(id), error: null };
+  const local = await idbGet(id).catch(() => null);
+  const { blob, error } = local ? { blob: local, error: null } : await downloadRemote(id);
+  if (!blob) return { url: null, error };
   idbPut(id, blob).catch(() => {});
   const url = URL.createObjectURL(blob);
   urlCache.set(id, url);
-  return url;
+  return { url, error: null };
 }
 
 function objectPath(id) {
@@ -122,12 +127,19 @@ function objectPath(id) {
 
 async function storageFetch(id, { method = 'GET', body, headers = {} } = {}) {
   const config = getConfig();
+  if (!config) throw new Error('synchroniseren is niet ingesteld');
   const session = await ensureToken();
   return fetch(`${config.url}/storage/v1/object/${BUCKET}/${objectPath(id)}`, {
     method,
     headers: { apikey: config.anonKey, Authorization: `Bearer ${session.access_token}`, ...headers },
     body,
   });
+}
+
+function describeStatus(status) {
+  if (status === 404) return `404 — nog niet geüpload, of bucket ontbreekt (storage.sql gedraaid?)`;
+  if (status === 401 || status === 403) return `${status} — geen toegang (RLS-policy of ingelogde gebruiker klopt niet)`;
+  return `serverfout ${status}`;
 }
 
 /**
@@ -141,24 +153,26 @@ async function uploadInBackground(id, blob) {
   try {
     const res = await storageFetch(id, { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'true' } });
     if (!res.ok) {
-      console.warn('Afbeelding uploaden mislukt', res.status);
-      toast(res.status === 404
-        ? 'Foto kon niet naar je account — is supabase/storage.sql al gedraaid?'
-        : 'Foto opslaan op je account mislukt, hij blijft op dit toestel staan', 4500);
+      const body = await res.text().catch(() => '');
+      console.warn('Afbeelding uploaden mislukt', res.status, body);
+      toast(`Foto opslaan op je account mislukt (${describeStatus(res.status)}) — hij blijft op dit toestel staan`, 5500);
     }
   } catch (err) {
     console.warn('Afbeelding uploaden mislukt, probeer later opnieuw', err);
-    toast('Foto opslaan op je account mislukt, hij blijft op dit toestel staan', 4500);
+    toast('Foto opslaan op je account mislukt (netwerk) — hij blijft op dit toestel staan', 4500);
   }
 }
 
 async function downloadRemote(id) {
-  if (!isSignedIn()) return null;
+  if (!isSignedIn()) return { blob: null, error: 'niet ingelogd op dit toestel' };
   try {
     const res = await storageFetch(id);
-    return res.ok ? await res.blob() : null;
-  } catch {
-    return null;
+    if (res.ok) return { blob: await res.blob(), error: null };
+    const body = await res.text().catch(() => '');
+    console.warn('Afbeelding ophalen mislukt', res.status, body);
+    return { blob: null, error: describeStatus(res.status) };
+  } catch (err) {
+    return { blob: null, error: `netwerkfout: ${err.message}` };
   }
 }
 
