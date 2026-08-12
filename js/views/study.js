@@ -76,7 +76,7 @@ export function mount(root, params = {}) {
     ]),
     el('div', { class: 'bar' }, [levelFill]),
   ]);
-  const hint = el('div', { class: 'kbd-hint', text: 'Spatie = omdraaien · 1-4 = beoordelen · Backspace = nog eens bekijken · E = bewerken · U = ongedaan maken' });
+  const hint = el('div', { class: 'kbd-hint', text: 'Spatie = omdraaien · 1-4 = beoordelen · Backspace = nog eens bekijken · E = bewerken · I = afbeelding · U = ongedaan maken' });
   root.append(stage, levelStrip, hint);
 
   let level = levelInfo(totalXp(store.stats));
@@ -126,6 +126,12 @@ export function mount(root, params = {}) {
         title: 'Bewerken',
         onclick: () => startEdit(side),
       }, [icon('pencil', 15)]),
+      el('button', {
+        class: 'face-tool',
+        'aria-label': 'Afbeelding',
+        title: 'Afbeelding toevoegen of wijzigen',
+        onclick: () => startImageEdit(side),
+      }, [icon('camera', 15)]),
       el('button', {
         class: 'face-tool danger',
         'aria-label': 'Kaart verwijderen',
@@ -244,6 +250,77 @@ export function mount(root, params = {}) {
       if (event.key === 'Escape') { event.preventDefault(); stop(); }
       if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); save(); }
     });
+  }
+
+  /**
+   * Zelfde plek als tekst bewerken: soms bedenk je je tijdens het overhoren
+   * pas dat er een plaatje bij moet. Cloze-kaarten hebben één afbeelding voor
+   * de hele kaart, dus die zet je op beide kanten tegelijk.
+   */
+  function startImageEdit(side) {
+    if (!card || editing) return;
+    editing = true;
+
+    const face = stage.querySelector(`.face.${side}`);
+    if (!face) { editing = false; return; }
+
+    const isCloze = card.type === 'cloze';
+    const prop = isCloze || side === 'front' ? 'frontImage' : 'backImage';
+    const currentId = card[prop];
+
+    const revealBtn = stage.querySelector('.reveal-btn');
+    if (revealBtn) revealBtn.disabled = true;
+
+    const stop = () => {
+      editing = false;
+      if (revealBtn) revealBtn.disabled = false;
+      paintFace('front');
+      paintFace('back');
+    };
+
+    const gallery = el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
+    const camera = el('input', { type: 'file', accept: 'image/*', capture: 'environment', style: 'display:none' });
+
+    async function handle(input) {
+      const file = input.files?.[0];
+      input.value = '';
+      if (!file) return;
+      try {
+        const id = await images.saveImage(file);
+        store.updateCard(card.id, isCloze ? { frontImage: id, backImage: id } : { [prop]: id });
+        toast('Afbeelding opgeslagen');
+      } catch (err) {
+        toast(`Afbeelding opslaan mislukt: ${err.message}`);
+      }
+      stop();
+    }
+    gallery.addEventListener('change', () => handle(gallery));
+    camera.addEventListener('change', () => handle(camera));
+
+    function removeImage() {
+      const oldId = currentId;
+      store.updateCard(card.id, isCloze ? { frontImage: null, backImage: null } : { [prop]: null });
+      images.deleteImage(oldId);
+      toast('Afbeelding verwijderd');
+      stop();
+    }
+
+    const editor = el('div', { class: 'qa-editor', onclick: (event) => event.stopPropagation() }, [
+      el('div', { class: 'row', style: 'flex-wrap:nowrap;justify-content:center' }, [
+        el('button', { class: 'btn btn-secondary btn-sm', text: 'Kies foto', onclick: () => gallery.click() }),
+        el('button', { class: 'btn btn-secondary btn-sm', text: 'Maak foto', onclick: () => camera.click() }),
+      ]),
+      el('div', { class: 'row', style: 'flex-wrap:nowrap;justify-content:center' }, [
+        el('button', { class: 'btn btn-secondary btn-sm', text: 'Annuleren', onclick: stop }),
+        currentId ? el('button', { class: 'btn btn-danger btn-sm', text: 'Verwijderen', onclick: removeImage }) : null,
+      ]),
+      gallery,
+      camera,
+    ]);
+
+    const existingImg = face.querySelector('.qa-image');
+    if (existingImg) existingImg.replaceWith(editor);
+    else face.querySelector('.kicker')?.insertAdjacentElement('afterend', editor);
   }
 
   async function removeCard() {
@@ -418,6 +495,9 @@ export function mount(root, params = {}) {
     } else if (event.key.toLowerCase() === 'e') {
       event.preventDefault();
       startEdit(stage.querySelector('.flip')?.classList.contains('revealed') ? 'back' : 'front');
+    } else if (event.key.toLowerCase() === 'i') {
+      event.preventDefault();
+      startImageEdit(stage.querySelector('.flip')?.classList.contains('revealed') ? 'back' : 'front');
     } else if (event.key.toLowerCase() === 'u') {
       doUndo();
     } else if (event.key === 'Escape') {

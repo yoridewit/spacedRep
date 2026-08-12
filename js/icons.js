@@ -13,6 +13,7 @@ const PATHS = {
   pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/>',
   check: '<path d="M20 6L9 17l-5-5"/>',
   trash: '<path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>',
+  camera: '<path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h3.5l1.5-2.5h6L16 6h5a2 2 0 012 2z"/><circle cx="12" cy="13.5" r="3.8"/>',
 };
 
 export function icon(name, size = 16) {
