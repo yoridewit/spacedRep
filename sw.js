@@ -11,7 +11,7 @@
  * zonder verbinding start.
  */
 
-const CACHE = 'kaartjes-v14';
+const CACHE = 'kaartjes-v15';
 const SHELL = [
   './',
   'index.html',
@@ -30,6 +30,7 @@ const SHELL = [
   'js/merge.js',
   'js/keycheck.js',
   'js/sync.js',
+  'js/images.js',
   'js/daystats.js',
   'js/device.js',
   'js/version.js',

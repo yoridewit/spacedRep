@@ -209,6 +209,8 @@ class Store extends EventTarget {
         back: raw.back || '',
         text: raw.text || '',
         clozeIndex: raw.clozeIndex ?? null,
+        frontImage: raw.frontImage || null,
+        backImage: raw.backImage || null,
         hint: raw.hint || '',
         note: raw.note || '',
         tags: Array.isArray(raw.tags) ? raw.tags : [],

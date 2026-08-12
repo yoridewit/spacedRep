@@ -1,6 +1,7 @@
 import { store } from '../store.js';
 import { RATING, previewIntervals } from '../srs.js';
 import { renderMarkup, renderCloze, cardSummary } from '../markup.js';
+import * as images from '../images.js';
 import { achievements, achievementTiers, newlyEarned, totalXp, streak, dailyProgress, levelInfo, XP_DAILY_GOAL } from '../gamify.js';
 import { el, clear, appendAll, toast, confirmDialog } from '../ui.js';
 import { icon } from '../icons.js';
@@ -134,11 +135,19 @@ export function mount(root, params = {}) {
     ]);
   }
 
+  function imageEl(id) {
+    if (!id) return null;
+    const img = el('img', { class: 'qa-image', alt: '' });
+    images.imageUrl(id).then((url) => { if (url) img.src = url; else img.remove(); });
+    return img;
+  }
+
   function faceContent(side) {
     if (side === 'front') {
       return [
         faceTools('front'),
         el('span', { class: 'kicker', text: card.type === 'cloze' ? 'Vul aan' : 'Vraag' }),
+        imageEl(card.frontImage),
         el('div', { class: 'qa-text', html: questionHtml(card) }),
         card.hint && card.type !== 'cloze' ? el('div', { class: 'qa-hint', text: card.hint }) : null,
         el('span', { class: 'tap-hint', text: 'Tik om het antwoord te zien' }),
@@ -147,6 +156,7 @@ export function mount(root, params = {}) {
     return [
       faceTools('back'),
       el('span', { class: 'kicker', text: 'Antwoord' }),
+      imageEl(card.backImage),
       el('div', { class: 'qa-text', html: answerHtml(card) }),
       card.note ? el('div', { class: 'qa-note', html: renderMarkup(card.note) }) : null,
       card.tags?.length ? el('div', { class: 'tag-row' }, card.tags.map((t) => el('span', { class: 'tag', text: t }))) : null,
@@ -245,6 +255,8 @@ export function mount(root, params = {}) {
       danger: true,
     });
     if (!ok) return;
+    images.deleteImage(card.frontImage);
+    images.deleteImage(card.backImage);
     store.deleteCard(card.id);
     toast('Kaart verwijderd');
     next();

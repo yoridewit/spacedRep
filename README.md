@@ -11,6 +11,8 @@ iPhone te draaien én op je pc te gebruiken om kaarten toe te voegen.
 - **Anki-achtig leren.** SM-2-planner met leerstappen, ease-factor, herleren na
   fouten en daglimieten voor nieuwe kaarten en herhalingen.
 - **Werkt offline.** Alles staat in je eigen browser; geen server nodig.
+- **Afbeeldingen bij kaarten.** Kies een foto of maak er meteen een met je
+  camera, apart voor de voor- en achterkant.
 - **Synchroniseren tussen apparaten** (optioneel) via je eigen Supabase-project,
   met een echte merge in plaats van "laatste wint".
 - **Voortgang die motiveert.** Dagdoel, streak met vriezers, XP, niveaus met
@@ -75,6 +77,10 @@ build-stap, en offline werkt gewoon door.
    nieuw toestel hoef je daarna **alleen nog in te loggen**.
 3. Maak in de app een account aan met e-mail en wachtwoord en log in. Staat
    *Confirm email* aan in je project, klik dan eenmalig op de bevestigingslink.
+4. Wil je dat foto's bij kaarten ook meelopen naar je andere apparaten, draai
+   dan ook [`supabase/storage.sql`](supabase/storage.sql). Zonder die stap
+   werkt alles gewoon door, maar blijft een foto op het apparaat waar je hem
+   toevoegde.
 
 Wil je die gegevens liever niet in de repo, laat `config.js` dan leeg: de app
 vraagt er dan zelf om onder **Instellingen → Synchroniseren**, en de knop
@@ -231,19 +237,21 @@ js/device.js          id van dit apparaat (blijft lokaal)
 js/keycheck.js        weigert geheime Supabase-sleutels
 js/merge.js           samenvoegen van twee apparaten
 js/sync.js            Supabase-client (auth + REST via fetch)
+js/images.js          afbeeldingen: IndexedDB lokaal, Supabase Storage bij sync
 js/views/*.js         schermen
 sw.js                 service worker voor offline gebruik
 decks/                optionele bibliotheek die naast de app staat
 tools/make-icons.py   genereert de PNG-iconen
 tools/write-config.mjs schrijft config.js bij het uitrollen
 supabase/schema.sql   tabel + RLS voor synchronisatie
+supabase/storage.sql  bucket + RLS voor afbeeldingen bij kaarten
 tests/run.js          tests voor planner, parser, opmaak, merge en sync
 ```
 
 Geen dependencies, geen build-stap: gewoon ES-modules die de browser zelf laadt.
 
 ```bash
-node tests/run.js        # 58 tests
+node tests/run.js        # 69 tests
 python3 tools/make-icons.py
 ```
 

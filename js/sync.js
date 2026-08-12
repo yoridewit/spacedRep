@@ -268,7 +268,8 @@ async function refreshSession() {
   return getSession();
 }
 
-async function ensureToken() {
+/** Zorgt voor een geldig token; gebruikt door images.js voor de Storage-API. */
+export async function ensureToken() {
   const session = getSession();
   if (!session) throw new SyncError('Je bent niet ingelogd.');
   if (!session.access_token || session.expires_at - Date.now() < 60_000) await refreshSession();

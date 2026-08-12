@@ -2,6 +2,7 @@ import { store } from '../store.js';
 import { cardSummary, cardAnswerSummary } from '../markup.js';
 import { formatDelay } from '../srs.js';
 import { mastery } from '../gamify.js';
+import * as images from '../images.js';
 import {
   el, clear, toast, dialog, confirmDialog, promptDialog,
   copyToClipboard, downloadJson, encodeShare, plural,
@@ -127,11 +128,18 @@ export function mount(root, params = {}) {
     back.value = card?.back || '';
     tags.value = (card?.tags || []).join(', ');
 
+    // Cloze-kaarten hebben maar één zijde tekst, dus ook maar één afbeelding —
+    // die staat op beide kanten van de kaart.
+    const frontImage = imageField(isCloze ? 'Afbeelding' : 'Afbeelding bij de voorkant', card?.frontImage);
+    const backImage = isCloze ? null : imageField('Afbeelding bij de achterkant', card?.backImage);
+
     const result = await dialog((done) =>
       el('form', { method: 'dialog', onsubmit: (e) => e.preventDefault() }, [
         el('h3', { text: card ? 'Kaart bewerken' : 'Nieuwe kaart' }),
         el('label', { class: 'field' }, [el('span', { class: 'label', text: isCloze ? 'Tekst' : 'Voorkant' }), front]),
         isCloze ? null : el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Achterkant' }), back]),
+        frontImage.node,
+        backImage ? backImage.node : null,
         el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Tags' }), tags]),
         el('div', { class: 'row', style: 'flex-wrap:nowrap' }, [
           el('button', { type: 'button', class: 'btn btn-secondary', text: 'Annuleren', onclick: () => done(null) }),
@@ -147,6 +155,8 @@ export function mount(root, params = {}) {
 
     if (!result) return;
     if (result === 'delete') {
+      images.deleteImage(card.frontImage);
+      images.deleteImage(card.backImage);
       store.deleteCard(card.id);
       toast('Kaart verwijderd');
     } else if (result === 'reset') {
@@ -154,17 +164,75 @@ export function mount(root, params = {}) {
       toast('Voortgang gereset');
     } else {
       const tagList = tags.value.split(',').map((t) => t.trim()).filter(Boolean);
+      const newFrontImage = frontImage.getId();
+      const newBackImage = isCloze ? newFrontImage : backImage.getId();
       if (card) {
         store.updateCard(card.id, isCloze
-          ? { text: front.value.trim(), tags: tagList }
-          : { front: front.value.trim(), back: back.value.trim(), tags: tagList });
+          ? { text: front.value.trim(), tags: tagList, frontImage: newFrontImage, backImage: newFrontImage }
+          : { front: front.value.trim(), back: back.value.trim(), tags: tagList, frontImage: newFrontImage, backImage: newBackImage });
       } else {
         if (!front.value.trim() || !back.value.trim()) return toast('Voor- en achterkant zijn allebei nodig');
-        store.addCards(deck.id, [{ type: 'basic', front: front.value.trim(), back: back.value.trim(), tags: tagList }], { skipDuplicates: false });
+        store.addCards(deck.id, [{
+          type: 'basic', front: front.value.trim(), back: back.value.trim(), tags: tagList,
+          frontImage: newFrontImage, backImage: newBackImage,
+        }], { skipDuplicates: false });
       }
       toast('Opgeslagen');
     }
     refresh();
+  }
+
+  /**
+   * Kies-foto / camera-knoppen met voorvertoning. De foto wordt meteen bij het
+   * kiezen gecomprimeerd en bewaard — bij Annuleren blijft hij gewoon
+   * ongebruikt staan, dat is onschuldiger dan de gebruiker op een upload laten
+   * wachten na het klikken op Opslaan.
+   */
+  function imageField(label, initialId) {
+    let currentId = initialId || null;
+    const preview = el('div', { class: 'image-field-preview' });
+    const gallery = el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
+    const camera = el('input', { type: 'file', accept: 'image/*', capture: 'environment', style: 'display:none' });
+
+    function paint() {
+      clear(preview);
+      if (currentId) {
+        const img = el('img', { class: 'image-field-thumb', alt: '' });
+        images.imageUrl(currentId).then((url) => { if (url) img.src = url; });
+        preview.append(
+          img,
+          el('button', { type: 'button', class: 'btn btn-secondary btn-sm', text: 'Verwijderen', onclick: () => { currentId = null; paint(); } })
+        );
+      } else {
+        preview.append(
+          el('div', { class: 'row' }, [
+            el('button', { type: 'button', class: 'btn btn-secondary btn-sm', text: 'Kies foto', onclick: () => gallery.click() }),
+            el('button', { type: 'button', class: 'btn btn-secondary btn-sm', text: 'Maak foto', onclick: () => camera.click() }),
+          ])
+        );
+      }
+    }
+
+    async function handle(input) {
+      const file = input.files?.[0];
+      input.value = '';
+      if (!file) return;
+      try {
+        currentId = await images.saveImage(file);
+        paint();
+      } catch (err) {
+        toast(`Afbeelding opslaan mislukt: ${err.message}`);
+      }
+    }
+
+    gallery.addEventListener('change', () => handle(gallery));
+    camera.addEventListener('change', () => handle(camera));
+    paint();
+
+    return {
+      node: el('div', { class: 'field' }, [el('span', { class: 'label', text: label }), preview, gallery, camera]),
+      getId: () => currentId,
+    };
   }
 
   async function rename() {
@@ -217,6 +285,10 @@ export function mount(root, params = {}) {
       danger: true,
     });
     if (!ok) return;
+    for (const c of store.deckCards(deck.id)) {
+      images.deleteImage(c.frontImage);
+      images.deleteImage(c.backImage);
+    }
     store.deleteDeck(deck.id);
     toast('Deck verwijderd');
     navigate('#/');
