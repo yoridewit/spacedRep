@@ -136,10 +136,16 @@ async function storageFetch(id, { method = 'GET', body, headers = {} } = {}) {
   });
 }
 
-function describeStatus(status) {
-  if (status === 404) return `404 — nog niet geüpload, of bucket ontbreekt (storage.sql gedraaid?)`;
-  if (status === 401 || status === 403) return `${status} — geen toegang (RLS-policy of ingelogde gebruiker klopt niet)`;
-  return `serverfout ${status}`;
+/** Pakt de menselijke boodschap uit Supabase' foutrespons; die is specifieker dan de HTTP-status alleen. */
+function describeError(status, bodyText) {
+  try {
+    const data = JSON.parse(bodyText);
+    const msg = data.message || data.error_description || data.error || null;
+    if (msg) return `${status}: ${msg}`;
+  } catch {
+    // geen JSON — dan de ruwe tekst maar
+  }
+  return bodyText ? `${status}: ${bodyText.slice(0, 140)}` : `serverfout ${status}`;
 }
 
 /**
@@ -155,7 +161,7 @@ async function uploadInBackground(id, blob) {
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       console.warn('Afbeelding uploaden mislukt', res.status, body);
-      toast(`Foto opslaan op je account mislukt (${describeStatus(res.status)}) — hij blijft op dit toestel staan`, 5500);
+      toast(`Foto opslaan op je account mislukt (${describeError(res.status, body)}) — hij blijft op dit toestel staan`, 6000);
     }
   } catch (err) {
     console.warn('Afbeelding uploaden mislukt, probeer later opnieuw', err);
@@ -170,7 +176,7 @@ async function downloadRemote(id) {
     if (res.ok) return { blob: await res.blob(), error: null };
     const body = await res.text().catch(() => '');
     console.warn('Afbeelding ophalen mislukt', res.status, body);
-    return { blob: null, error: describeStatus(res.status) };
+    return { blob: null, error: describeError(res.status, body) };
   } catch (err) {
     return { blob: null, error: `netwerkfout: ${err.message}` };
   }
