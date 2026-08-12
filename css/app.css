@@ -610,6 +610,11 @@ textarea.input {
 }
 
 .qa-image { max-width: 100%; max-height: 200px; object-fit: contain; border-radius: var(--radius-md); }
+.qa-image-missing {
+  padding: var(--space-3);
+  border: 1px dashed color-mix(in srgb, var(--color-text) 25%, transparent);
+  border-radius: var(--radius-md);
+}
 
 .qa-text { font-size: 20px; font-family: var(--font-heading); margin: 0; line-height: 1.3; overflow-wrap: anywhere; }
 .qa-text p { margin: 0 0 var(--space-2); }

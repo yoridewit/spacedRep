@@ -14,6 +14,7 @@
  */
 
 import { getConfig, getSession, isSignedIn, ensureToken } from './sync.js';
+import { toast } from './ui.js';
 
 const DB_NAME = 'kaartjes-images';
 const DB_VERSION = 1;
@@ -129,13 +130,25 @@ async function storageFetch(id, { method = 'GET', body, headers = {} } = {}) {
   });
 }
 
+/**
+ * Mislukt de upload, dan zie je die foto nooit terug op een ander apparaat —
+ * en zonder melding zou je dat pas merken als je daar toevallig gaat kijken.
+ * Daarom hier wél een toast, in tegenstelling tot de stille achtergrond-sync
+ * van de rest van je gegevens.
+ */
 async function uploadInBackground(id, blob) {
   if (!isSignedIn()) return;
   try {
     const res = await storageFetch(id, { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'true' } });
-    if (!res.ok) console.warn('Afbeelding uploaden mislukt', res.status);
+    if (!res.ok) {
+      console.warn('Afbeelding uploaden mislukt', res.status);
+      toast(res.status === 404
+        ? 'Foto kon niet naar je account — is supabase/storage.sql al gedraaid?'
+        : 'Foto opslaan op je account mislukt, hij blijft op dit toestel staan', 4500);
+    }
   } catch (err) {
     console.warn('Afbeelding uploaden mislukt, probeer later opnieuw', err);
+    toast('Foto opslaan op je account mislukt, hij blijft op dit toestel staan', 4500);
   }
 }
 

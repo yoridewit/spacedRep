@@ -199,7 +199,10 @@ export function mount(root, params = {}) {
       clear(preview);
       if (currentId) {
         const img = el('img', { class: 'image-field-thumb', alt: '' });
-        images.imageUrl(currentId).then((url) => { if (url) img.src = url; });
+        images.imageUrl(currentId).then((url) => {
+          if (url) img.src = url;
+          else img.replaceWith(el('div', { class: 'small muted', text: 'Kon niet geladen worden (nog niet gesynchroniseerd?)' }));
+        });
         preview.append(
           img,
           el('button', { type: 'button', class: 'btn btn-secondary btn-sm', text: 'Verwijderen', onclick: () => { currentId = null; paint(); } })
