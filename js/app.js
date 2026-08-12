@@ -5,6 +5,7 @@ import { el, clear, toast } from './ui.js';
 import { icon } from './icons.js';
 import { totalXp, levelInfo, streak } from './gamify.js';
 import { syncQuietly, scheduleSync, flushSync, isSignedIn, isConfigured, authSkipped, adoptTokens } from './sync.js';
+import { retryPendingUploads } from './images.js';
 import * as home from './views/home.js';
 import * as study from './views/study.js';
 import * as add from './views/add.js';
@@ -199,6 +200,7 @@ document.addEventListener('visibilitychange', () => {
     flushSync();
   } else if (isSignedIn()) {
     syncQuietly(); // terug in de app: eerst kijken of het andere apparaat iets heeft
+    retryPendingUploads(); // en eventuele foto's die vorige keer niet af kwamen alsnog versturen
   }
 });
 
@@ -209,8 +211,8 @@ const handledAuthHash = await consumeAuthHash();
 if (!handledAuthHash) render();
 
 if (frozen) toast('Gisteren gemist — een vriezer heeft je reeks gered', 4000);
-if (isSignedIn()) syncQuietly();
-window.addEventListener('online', () => syncQuietly());
+if (isSignedIn()) { syncQuietly(); retryPendingUploads(); }
+window.addEventListener('online', () => { syncQuietly(); retryPendingUploads(); });
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
