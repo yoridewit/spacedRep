@@ -128,10 +128,11 @@ export function mount(root, params = {}) {
     back.value = card?.back || '';
     tags.value = (card?.tags || []).join(', ');
 
-    // Cloze-kaarten hebben maar één zijde tekst, dus ook maar één afbeelding —
-    // die staat op beide kanten van de kaart.
-    const frontImage = imageField(isCloze ? 'Afbeelding' : 'Afbeelding bij de voorkant', card?.frontImage);
-    const backImage = isCloze ? null : imageField('Afbeelding bij de achterkant', card?.backImage);
+    // Cloze-kaarten delen hun tekst tussen voor- en achterkant, maar mogen wel
+    // elk hun eigen afbeelding hebben — bijvoorbeeld de opgave met een foto,
+    // het antwoord zonder, of andersom.
+    const frontImage = imageField(isCloze ? 'Afbeelding bij de opgave' : 'Afbeelding bij de voorkant', card?.frontImage);
+    const backImage = imageField(isCloze ? 'Afbeelding bij het antwoord' : 'Afbeelding bij de achterkant', card?.backImage);
 
     const result = await dialog((done) =>
       el('form', { method: 'dialog', onsubmit: (e) => e.preventDefault() }, [
@@ -139,7 +140,7 @@ export function mount(root, params = {}) {
         el('label', { class: 'field' }, [el('span', { class: 'label', text: isCloze ? 'Tekst' : 'Voorkant' }), front]),
         isCloze ? null : el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Achterkant' }), back]),
         frontImage.node,
-        backImage ? backImage.node : null,
+        backImage.node,
         el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Tags' }), tags]),
         el('div', { class: 'row', style: 'flex-wrap:nowrap' }, [
           el('button', { type: 'button', class: 'btn btn-secondary', text: 'Annuleren', onclick: () => done(null) }),
@@ -165,10 +166,10 @@ export function mount(root, params = {}) {
     } else {
       const tagList = tags.value.split(',').map((t) => t.trim()).filter(Boolean);
       const newFrontImage = frontImage.getId();
-      const newBackImage = isCloze ? newFrontImage : backImage.getId();
+      const newBackImage = backImage.getId();
       if (card) {
         store.updateCard(card.id, isCloze
-          ? { text: front.value.trim(), tags: tagList, frontImage: newFrontImage, backImage: newFrontImage }
+          ? { text: front.value.trim(), tags: tagList, frontImage: newFrontImage, backImage: newBackImage }
           : { front: front.value.trim(), back: back.value.trim(), tags: tagList, frontImage: newFrontImage, backImage: newBackImage });
       } else {
         if (!front.value.trim() || !back.value.trim()) return toast('Voor- en achterkant zijn allebei nodig');

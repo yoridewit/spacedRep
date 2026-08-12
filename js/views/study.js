@@ -254,8 +254,7 @@ export function mount(root, params = {}) {
 
   /**
    * Zelfde plek als tekst bewerken: soms bedenk je je tijdens het overhoren
-   * pas dat er een plaatje bij moet. Cloze-kaarten hebben één afbeelding voor
-   * de hele kaart, dus die zet je op beide kanten tegelijk.
+   * pas dat er een plaatje bij moet — los per kant, ook bij cloze-kaarten.
    */
   function startImageEdit(side) {
     if (!card || editing) return;
@@ -264,8 +263,7 @@ export function mount(root, params = {}) {
     const face = stage.querySelector(`.face.${side}`);
     if (!face) { editing = false; return; }
 
-    const isCloze = card.type === 'cloze';
-    const prop = isCloze || side === 'front' ? 'frontImage' : 'backImage';
+    const prop = side === 'front' ? 'frontImage' : 'backImage';
     const currentId = card[prop];
 
     const revealBtn = stage.querySelector('.reveal-btn');
@@ -287,7 +285,7 @@ export function mount(root, params = {}) {
       if (!file) return;
       try {
         const id = await images.saveImage(file);
-        store.updateCard(card.id, isCloze ? { frontImage: id, backImage: id } : { [prop]: id });
+        store.updateCard(card.id, { [prop]: id });
         toast('Afbeelding opgeslagen');
       } catch (err) {
         toast(`Afbeelding opslaan mislukt: ${err.message}`);
@@ -299,7 +297,7 @@ export function mount(root, params = {}) {
 
     function removeImage() {
       const oldId = currentId;
-      store.updateCard(card.id, isCloze ? { frontImage: null, backImage: null } : { [prop]: null });
+      store.updateCard(card.id, { [prop]: null });
       images.deleteImage(oldId);
       toast('Afbeelding verwijderd');
       stop();
