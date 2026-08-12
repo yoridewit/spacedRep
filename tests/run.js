@@ -440,6 +440,17 @@ test('de oudere planning overschrijft de nieuwere niet', () => {
   eq(Object.values(state.cards)[0].srs.interval, 12);
 });
 
+test('een review op het ene apparaat overschrijft geen los bewerkte inhoud op het andere', () => {
+  const geoefend = card('c_1', 'd_1', 'Wat is DNA?', { lastReview: NOW, interval: 12, state: 'review' });
+  const bewerkt = { ...card('c_2', 'd_1', 'Wat is DNA?'), backImage: 'img_123', updatedAt: NOW - 1 * DAY };
+  const local = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_1: geoefend } };
+  const remote = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_2: bewerkt } };
+  const { state } = mergeStates(local, remote);
+  const merged = Object.values(state.cards)[0];
+  eq(merged.srs.interval, 12, 'de nieuwste planning blijft staan');
+  eq(merged.backImage, 'img_123', 'de losse foto-wijziging gaat niet verloren');
+});
+
 test('een verwijderde kaart komt niet terug', () => {
   const weg = card('c_2', 'd_1', 'Weggegooid', { lastReview: NOW - 2 * DAY });
   const local = {

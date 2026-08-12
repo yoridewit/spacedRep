@@ -14,11 +14,11 @@
  */
 
 import { getConfig, getSession, isSignedIn, ensureToken } from './sync.js';
-import { toast } from './ui.js';
 
 const DB_NAME = 'kaartjes-images';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE = 'images';
+const PENDING_STORE = 'pending-uploads';
 const BUCKET = 'card-images';
 const MAX_DIM = 1600;
 const QUALITY = 0.82;
@@ -28,7 +28,11 @@ function openDb() {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+        if (!db.objectStoreNames.contains(PENDING_STORE)) db.createObjectStore(PENDING_STORE);
+      };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
@@ -62,6 +66,36 @@ function idbDelete(id) {
   }));
 }
 
+// Bijhouden welke foto's nog naar de server moeten — de upload zelf loopt op
+// de achtergrond, en als je vlak daarna wegnavigeert of het scherm
+// vergrendelt kan die halverwege afbreken. Dit zorgt dat zo'n onderbroken
+// upload de volgende keer dat je de app opent gewoon opnieuw geprobeerd wordt.
+function markPending(id) {
+  return openDb().then((db) => new Promise((resolve) => {
+    const tx = db.transaction(PENDING_STORE, 'readwrite');
+    tx.objectStore(PENDING_STORE).put(true, id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  }));
+}
+
+function clearPending(id) {
+  return openDb().then((db) => new Promise((resolve) => {
+    const tx = db.transaction(PENDING_STORE, 'readwrite');
+    tx.objectStore(PENDING_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  }));
+}
+
+function listPending() {
+  return openDb().then((db) => new Promise((resolve) => {
+    const req = db.transaction(PENDING_STORE, 'readonly').objectStore(PENDING_STORE).getAllKeys();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => resolve([]);
+  }));
+}
+
 function uid() {
   const rnd = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
   return `img_${rnd.replace(/-/g, '').slice(0, 16)}`;
@@ -88,14 +122,30 @@ export async function saveImage(file) {
   const blob = await compress(file);
   const id = uid();
   await idbPut(id, blob);
+  await markPending(id);
   uploadInBackground(id, blob);
   return id;
+}
+
+/**
+ * Probeert alle nog niet bevestigde uploads opnieuw. Aanroepen op momenten
+ * dat de app toch al "terug is": bij het opstarten en zodra je 'm weer
+ * zichtbaar maakt of weer online komt.
+ */
+export async function retryPendingUploads() {
+  if (!isSignedIn()) return;
+  for (const id of await listPending()) {
+    const blob = await idbGet(id).catch(() => null);
+    if (!blob) { clearPending(id); continue; } // lokaal ook weg, niets meer te uploaden
+    await uploadInBackground(id, blob);
+  }
 }
 
 /** Verwijdert een afbeelding lokaal en (best effort) op de server. */
 export async function deleteImage(id) {
   if (!id) return;
   await idbDelete(id).catch(() => {});
+  await clearPending(id);
   const cached = urlCache.get(id);
   if (cached) { URL.revokeObjectURL(cached); urlCache.delete(id); }
   deleteRemoteInBackground(id);
@@ -158,14 +208,14 @@ async function uploadInBackground(id, blob) {
   if (!isSignedIn()) return;
   try {
     const res = await storageFetch(id, { method: 'POST', body: blob, headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'true' } });
-    if (!res.ok) {
+    if (res.ok) {
+      clearPending(id);
+    } else {
       const body = await res.text().catch(() => '');
-      console.warn('Afbeelding uploaden mislukt', res.status, body);
-      toast(`Foto opslaan op je account mislukt (${describeError(res.status, body)}) — hij blijft op dit toestel staan`, 6000);
+      console.warn('Afbeelding uploaden mislukt, probeer opnieuw bij volgende gelegenheid', res.status, body);
     }
   } catch (err) {
-    console.warn('Afbeelding uploaden mislukt, probeer later opnieuw', err);
-    toast('Foto opslaan op je account mislukt (netwerk) — hij blijft op dit toestel staan', 4500);
+    console.warn('Afbeelding uploaden mislukt (netwerk), probeer opnieuw bij volgende gelegenheid', err);
   }
 }
 

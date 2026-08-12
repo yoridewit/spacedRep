@@ -215,6 +215,7 @@ class Store extends EventTarget {
         note: raw.note || '',
         tags: Array.isArray(raw.tags) ? raw.tags : [],
         created: now,
+        updatedAt: now,
         srs: newSrsState(now, this.settings.srs),
       };
       this.state.cards[card.id] = card;
@@ -227,7 +228,7 @@ class Store extends EventTarget {
   updateCard(id, patch) {
     const card = this.state.cards[id];
     if (!card) return null;
-    Object.assign(card, patch);
+    Object.assign(card, patch, { updatedAt: Date.now() });
     this.changed({ type: 'card', id });
     return card;
   }
@@ -245,6 +246,7 @@ class Store extends EventTarget {
     const card = this.state.cards[id];
     if (!card) return;
     card.srs = newSrsState(Date.now(), this.settings.srs);
+    card.updatedAt = Date.now();
     this.changed({ type: 'card', id });
   }
 
@@ -386,6 +388,7 @@ class Store extends EventTarget {
     const wasNew = before.state === 'new';
     const next = schedule(card.srs, rating, now, this.settings.srs);
     card.srs = next;
+    card.updatedAt = now;
 
     const stats = this.todayBucket(now);
     const mature = before.state === 'review' && before.interval >= MATURE_DAYS;

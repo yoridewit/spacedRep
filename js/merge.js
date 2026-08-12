@@ -32,9 +32,9 @@ export function emptyTombstones() {
   return { decks: {}, cards: {} };
 }
 
-/** Moment waarop een kaart voor het laatst "iets deed". */
+/** Moment waarop een kaart voor het laatst "iets deed" — review of bewerking. */
 function activity(card) {
-  return Math.max(card.srs?.lastReview || 0, card.created || 0);
+  return Math.max(card.updatedAt || 0, card.srs?.lastReview || 0, card.created || 0);
 }
 
 function mergeTombstones(a = {}, b = {}) {
@@ -107,21 +107,28 @@ export function mergeStates(local, remote) {
       return;
     }
 
-    // Beide kanten kennen deze kaart: de laatst geoefende planning wint.
+    // Beide kanten kennen deze kaart. Planning (srs) en inhoud (tekst,
+    // afbeeldingen, tags, ...) winnen elk apart, op basis van wanneer ze voor
+    // het laatst zijn aangeraakt — anders zou een foto toevoegen op het ene
+    // apparaat verdwijnen zodra het andere apparaat een keer had geoefend na
+    // dat moment, of andersom een net geoefende kaart terugvallen op een
+    // oudere planning omdat er ergens anders alleen tekst is aangepast.
     const existing = cards[existingId];
-    const mine = existing.srs?.lastReview || 0;
-    const theirs = card.srs?.lastReview || 0;
-    if (theirs > mine) {
-      cards[existingId] = {
-        ...card,
-        id: existingId,
-        deckId,
-        created: Math.min(existing.created || Infinity, card.created || Infinity),
-      };
-      if (from === 'remote') summary.cardsUpdated++;
-    } else {
-      existing.created = Math.min(existing.created || Infinity, card.created || Infinity);
+    const merged = { ...existing, id: existingId, deckId, created: Math.min(existing.created || Infinity, card.created || Infinity) };
+    let touched = false;
+
+    if ((card.srs?.lastReview || 0) > (existing.srs?.lastReview || 0)) {
+      merged.srs = card.srs;
+      touched = true;
     }
+    if ((card.updatedAt || 0) > (existing.updatedAt || 0)) {
+      const { srs, id, deckId: _deckId, created, ...content } = card;
+      Object.assign(merged, content);
+      touched = true;
+    }
+
+    cards[existingId] = merged;
+    if (touched && from === 'remote') summary.cardsUpdated++;
   };
 
   for (const card of Object.values(local.cards || {})) addCard(card, 'local');
