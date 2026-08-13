@@ -526,12 +526,16 @@ textarea.input {
 
 .flip {
   width: min(560px, 100%);
-  min-height: 300px;
   perspective: 1600px;
   cursor: pointer;
 }
+/*
+ * Grid in plaats van position:absolute: beide kanten staan zo in dezelfde cel
+ * (grid-area 1/1) en tellen wél mee voor de hoogte. Zo groeit de kaart mee met
+ * de langste kant — een grote foto bij de vraag knipt dan niet het antwoord af.
+ */
 .flip-inner {
-  position: relative;
+  display: grid;
   width: 100%;
   min-height: 300px;
   transform-style: preserve-3d;
@@ -540,8 +544,8 @@ textarea.input {
 .flip.revealed .flip-inner { transform: rotateY(180deg); }
 
 .face {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  grid-area: 1 / 1;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   border-radius: var(--radius-card);
