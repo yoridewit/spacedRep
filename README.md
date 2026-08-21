@@ -238,6 +238,7 @@ js/keycheck.js        weigert geheime Supabase-sleutels
 js/merge.js           samenvoegen van twee apparaten
 js/sync.js            Supabase-client (auth + REST via fetch)
 js/images.js          afbeeldingen: IndexedDB lokaal, Supabase Storage bij sync
+js/dedupe.js          spoort kaarten op die door de oude sync-bug verdubbeld zijn
 js/views/*.js         schermen
 sw.js                 service worker voor offline gebruik
 decks/                optionele bibliotheek die naast de app staat
@@ -251,7 +252,7 @@ tests/run.js          tests voor planner, parser, opmaak, merge en sync
 Geen dependencies, geen build-stap: gewoon ES-modules die de browser zelf laadt.
 
 ```bash
-node tests/run.js        # 69 tests
+node tests/run.js        # 76 tests
 python3 tools/make-icons.py
 ```
 

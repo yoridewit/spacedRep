@@ -16,6 +16,7 @@ import { mergeStates, contentKey } from '../js/merge.js';
 import { dayTotal, mergeDay, normalizeDay } from '../js/daystats.js';
 import { looksSecret } from '../js/keycheck.js';
 import { buildPrompt, suggestCardRange, countWords } from '../js/prompt.js';
+import { findDuplicateGroups } from '../js/dedupe.js';
 
 let passed = 0;
 const failures = [];
@@ -550,6 +551,43 @@ test('samenvoegen is idempotent', () => {
   eq(Object.keys(twice.decks).length, 1);
 });
 
+// ── dubbele kaarten opsporen ─────────────────────────────────────────────
+
+test('herkent een gespleten kaart: zelfde achterkant, andere voorkant', () => {
+  const a = card('c_1', 'd_1', 'Wat is de normale hartslag?');
+  const b = { ...card('c_2', 'd_1', 'Wat is een normale hartslag in rust?'), back: a.back };
+  const groups = findDuplicateGroups([a, b]);
+  eq(groups.length, 1);
+  eq(groups[0].cards.length, 2);
+});
+
+test('laat losse kaarten met toevallig hetzelfde korte antwoord met rust', () => {
+  const a = card('c_1', 'd_1', 'Wat is 2+2?');
+  const b = { ...card('c_2', 'd_1', 'Hoeveel pootjes heeft een hond, min twee?'), back: '4' };
+  a.back = '4';
+  eq(findDuplicateGroups([a, b]).length, 0, 'te kort om als duplicaat te gelden');
+});
+
+test('geen duplicaat als voor- én achterkant allebei verschillen', () => {
+  const a = card('c_1', 'd_1', 'Wat is DNA?');
+  const b = card('c_2', 'd_1', 'Wat is RNA?');
+  eq(findDuplicateGroups([a, b]).length, 0);
+});
+
+test('duplicaten worden per deck bekeken, niet over decks heen', () => {
+  const a = card('c_1', 'd_1', 'Lange herkenbare vraagtekst hier');
+  const b = { ...card('c_2', 'd_9', 'Andere vraag'), back: a.back };
+  eq(findDuplicateGroups([a, b]).length, 0, 'zelfde achterkant, maar andere deck');
+});
+
+test('een groep van drie levert één groep op, nieuwste eerst', () => {
+  const a = { ...card('c_1', 'd_1', 'Verouderde formulering van de vraag'), updatedAt: NOW - 2 * DAY };
+  const b = { ...card('c_2', 'd_1', 'Iets recentere formulering van de vraag'), back: a.back, updatedAt: NOW - DAY };
+  const c = { ...card('c_3', 'd_1', 'Nieuwste formulering van de vraag'), back: a.back, updatedAt: NOW };
+  const groups = findDuplicateGroups([a, b, c]);
+  eq(groups.length, 1);
+  eq(groups[0].cards.map((x) => x.id), ['c_3', 'c_2', 'c_1']);
+});
 
 // ── de opdracht voor de AI ───────────────────────────────────────────────
 

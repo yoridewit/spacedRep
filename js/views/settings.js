@@ -2,7 +2,7 @@ import { store, DEFAULT_SETTINGS } from '../store.js';
 import { isSignedIn } from '../sync.js';
 import { DEFAULT_CONFIG } from '../srs.js';
 import { el, toast, confirmDialog, downloadJson, pickFile, plural } from '../ui.js';
-import { refresh } from '../app.js';
+import { refresh, navigate } from '../app.js';
 import { syncPanel } from './sync-panel.js';
 import { versionLine } from '../version.js';
 
@@ -106,6 +106,12 @@ export function mount(root, params = {}) {
 
     el('h2', { class: 'section-title', text: 'Synchroniseren' }),
     syncPanel(params),
+
+    el('h2', { class: 'section-title', text: 'Onderhoud' }),
+    el('div', { class: 'panel' }, [
+      el('p', { class: 'small muted', style: 'margin-bottom:var(--space-3)', text: 'Een oude bug in het samenvoegen tussen apparaten kon een bewerkte kaart soms verdubbelen in plaats van bijwerken. Dit zoekt kaarten die daardoor mogelijk dubbel zijn komen te staan.' }),
+      el('button', { class: 'btn btn-secondary btn-sm', text: 'Zoek dubbele kaarten', onclick: () => navigate('#/duplicates') }),
+    ]),
 
     el('h2', { class: 'section-title', text: 'Back-up' }),
     el('div', { class: 'panel' }, [

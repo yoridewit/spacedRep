@@ -13,11 +13,12 @@ import * as deck from './views/deck.js';
 import * as stats from './views/stats.js';
 import * as settings from './views/settings.js';
 import * as auth from './views/auth.js';
+import * as duplicates from './views/duplicates.js';
 
 const viewRoot = document.getElementById('view');
 const topbar = document.getElementById('topbar');
 
-const ROUTES = { home, study, add, deck, stats, settings, auth };
+const ROUTES = { home, study, add, deck, stats, settings, auth, duplicates };
 
 const TABS = [
   { href: '#/', label: 'Decks', match: (r) => r.name === 'home' || r.name === 'deck' },
