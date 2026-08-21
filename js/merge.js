@@ -1,11 +1,17 @@
 /**
  * Samenvoegen van twee kopieën van de gegevens (bijvoorbeeld telefoon en pc).
  *
- * Twee apparaten kennen elkaars id's niet: dezelfde kaart die je op allebei
- * importeert krijgt twee verschillende id's. Daarom wordt er op inhoud
- * gematcht — decks op hun naam, kaarten op hun voorkant — precies zoals de
- * import dubbele kaarten herkent.
+ * Twee apparaten die een kaart nog nooit hebben samengevoegd kennen elkaars
+ * id's niet — importeer je dezelfde stof apart op allebei, dan krijgt die
+ * kaart twee verschillende id's. Daarom wordt er dán op inhoud gematcht,
+ * precies zoals de import dubbele kaarten herkent.
  *
+ * Heeft een kaart al eens gesynchroniseerd (beide kanten kennen hetzelfde
+ * id), dan is dat id de betrouwbare match, ook als de tekst intussen is
+ * aangepast: op inhoud matchen zou een bewerkte vraag juist als een nieuwe,
+ * losse kaart naast de oude behandelen in plaats van als een wijziging.
+ *
+
  * Regels, kort:
  *   - kaarten die maar aan één kant bestaan komen erbij;
  *   - staat een kaart aan beide kanten, dan wint de planning van de kant waar
@@ -89,6 +95,7 @@ export function mergeStates(local, remote) {
   // ── kaarten ────────────────────────────────────────────────────────────
   const cards = {};
   const byContent = new Map();    // inhoudssleutel -> id in het resultaat
+  const byId = new Map();         // origineel id (van weerskanten) -> id in het resultaat
 
   const addCard = (card, from) => {
     const deckId = remap.get(card.deckId);
@@ -98,14 +105,19 @@ export function mergeStates(local, remote) {
     const buried = tombstones.cards[key] || 0;
     if (buried > activity(card)) return;
 
-    const existingId = byContent.get(key);
-    if (!existingId) {
+    // Eerst op id (betrouwbaar zodra de kaart al eens is samengevoegd, blijft
+    // kloppen ook na een tekst- of foto-wijziging); pas als dat niets oplevert
+    // op inhoud, voor kaarten die elkaar nog nooit hebben gezien.
+    const existingId = byId.get(card.id) ?? byContent.get(key);
+    if (existingId === undefined) {
       const id = cards[card.id] ? `${card.id}x` : card.id;
       cards[id] = { ...card, id, deckId };
       byContent.set(key, id);
+      byId.set(card.id, id);
       if (from === 'remote') summary.cardsAdded++;
       return;
     }
+    byId.set(card.id, existingId);
 
     // Beide kanten kennen deze kaart. Planning (srs) en inhoud (tekst,
     // afbeeldingen, tags, ...) winnen elk apart, op basis van wanneer ze voor

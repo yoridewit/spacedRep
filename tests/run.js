@@ -451,6 +451,19 @@ test('een review op het ene apparaat overschrijft geen los bewerkte inhoud op he
   eq(merged.backImage, 'img_123', 'de losse foto-wijziging gaat niet verloren');
 });
 
+test('een bewerkte vraag levert geen dubbele kaart op na sync', () => {
+  // Zelfde id aan beide kanten (al eerder gesynchroniseerd), maar de tekst is
+  // aangepast — waardoor de inhoudssleutel verandert. Matchen moet op het
+  // gedeelde id blijven werken, niet op de (nu afwijkende) inhoud.
+  const bewerkt = { ...card('c_1', 'd_1', 'Nieuwe vraag na bewerken'), updatedAt: NOW };
+  const oud = { ...card('c_1', 'd_1', 'Oude vraag'), updatedAt: NOW - DAY };
+  const local = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_1: bewerkt } };
+  const remote = { ...emptyDoc(), decks: { d_1: deckA }, cards: { c_1: oud } };
+  const { state } = mergeStates(local, remote);
+  eq(Object.keys(state.cards).length, 1, 'geen dubbele kaart');
+  eq(Object.values(state.cards)[0].front, 'Nieuwe vraag na bewerken');
+});
+
 test('een verwijderde kaart komt niet terug', () => {
   const weg = card('c_2', 'd_1', 'Weggegooid', { lastReview: NOW - 2 * DAY });
   const local = {
