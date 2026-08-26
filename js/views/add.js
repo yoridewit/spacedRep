@@ -98,6 +98,29 @@ export function mount(root, params = {}) {
   manualDeckSelect.addEventListener('change', syncManualDeckField);
   syncManualDeckField();
 
+  // Extra velden, ingeklapt: de meeste kaarten hebben alleen een vraag en
+  // antwoord nodig, dus die twee blijven de snelle standaardweg.
+  const manualHint = el('input', { class: 'input', type: 'text', placeholder: 'Bijvoorbeeld een eerste letter of categorie' });
+  const manualNote = el('textarea', { class: 'input', style: 'min-height:60px', placeholder: 'Extra uitleg, bron of jaartal — pas zichtbaar bij het antwoord' });
+  const manualTags = el('input', { class: 'input', type: 'text', placeholder: 'tags, komma-gescheiden' });
+  const manualExtra = el('div', {
+    style: 'display:none',
+  }, [
+    el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Tip bij de vraag' }), manualHint]),
+    el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Opmerking bij het antwoord' }), manualNote]),
+    el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Tags' }), manualTags]),
+  ]);
+  const manualExtraToggle = el('button', {
+    type: 'button',
+    class: 'btn btn-secondary btn-sm',
+    text: '+ Meer opties (tip, opmerking, tags)',
+    onclick: () => {
+      const shown = manualExtra.style.display !== 'none';
+      manualExtra.style.display = shown ? 'none' : 'block';
+      manualExtraToggle.textContent = shown ? '+ Meer opties (tip, opmerking, tags)' : '− Meer opties verbergen';
+    },
+  });
+
   /** Bijwerken na een nieuwe deck of kaart, zodat de tellers en "Nieuwe deck"-lijstjes overal kloppen. */
   function refreshDeckOptions() {
     for (const select of [deckSelect, manualDeckSelect]) {
@@ -118,11 +141,18 @@ export function mount(root, params = {}) {
       if (!name) return toast('Geef de nieuwe deck een naam');
       deck = store.findDeckByName(name) || store.createDeck(name);
     }
-    store.addCards(deck.id, [{ type: 'basic', front, back }], { skipDuplicates: false });
+    const tagList = manualTags.value.split(',').map((t) => t.trim()).filter(Boolean);
+    store.addCards(deck.id, [{
+      type: 'basic', front, back,
+      hint: manualHint.value.trim(), note: manualNote.value.trim(), tags: tagList,
+    }], { skipDuplicates: false });
 
     toast('Kaart toegevoegd');
     manualFront.value = '';
     manualBack.value = '';
+    manualHint.value = '';
+    manualNote.value = '';
+    manualTags.value = '';
     manualFront.focus();
     // Eerst de opties verversen — anders bestaat de net aangemaakte deck nog
     // niet als <option> en blijft de selectie stil op "Nieuwe deck" hangen.
@@ -142,7 +172,11 @@ export function mount(root, params = {}) {
       el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Antwoord' }), manualBack]),
       el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Deck' }), manualDeckSelect]),
       manualDeckNameField,
-      el('button', { class: 'btn btn-primary', text: 'Kaart toevoegen', onclick: addManualCard }),
+      manualExtraToggle,
+      manualExtra,
+      el('div', { style: 'margin-top:var(--space-3)' }, [
+        el('button', { class: 'btn btn-primary', text: 'Kaart toevoegen', onclick: addManualCard }),
+      ]),
     ]),
 
     el('div', { class: 'panel' }, [
