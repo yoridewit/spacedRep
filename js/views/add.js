@@ -7,6 +7,14 @@ import { navigate } from '../app.js';
 
 const LIBRARY_URL = 'decks/index.json';
 
+/** Opties voor een deck-keuzeveld; hetzelfde lijstje staat op een paar plekken op deze pagina. */
+function deckOptions() {
+  return [
+    el('option', { value: '', text: 'Nieuwe deck' }),
+    ...store.listDecks().map((d) => el('option', { value: d.id, text: `${d.name} (${store.deckCards(d.id).length})` })),
+  ];
+}
+
 export function mount(root, params = {}) {
   let parsed = null;
 
@@ -23,10 +31,7 @@ export function mount(root, params = {}) {
 
   // Waar het heen gaat, meteen bovenaan: bij een bestaande deck krijgt de AI de
   // vragen die er al in staan mee, zodat je geen dubbele kaarten terugkrijgt.
-  const deckSelect = el('select', { class: 'input' }, [
-    el('option', { value: '', text: 'Nieuwe deck' }),
-    ...store.listDecks().map((d) => el('option', { value: d.id, text: `${d.name} (${store.deckCards(d.id).length})` })),
-  ]);
+  const deckSelect = el('select', { class: 'input' }, deckOptions());
 
   const amountSelect = el('select', { class: 'input' }, [
     el('option', { value: 'auto', text: 'Automatisch — past zich aan je stof aan' }),
@@ -82,9 +87,63 @@ export function mount(root, params = {}) {
     placeholder: 'Plak hier het antwoord van de AI (JSON), of regels in de vorm:\n\nvraag :: antwoord',
   });
 
+  // ── of gewoon zelf typen, zonder AI ──
+  const manualFront = el('textarea', { class: 'input', style: 'min-height:70px', placeholder: 'Vraag (voorkant)' });
+  const manualBack = el('textarea', { class: 'input', style: 'min-height:70px', placeholder: 'Antwoord (achterkant)' });
+  const manualDeckSelect = el('select', { class: 'input' }, deckOptions());
+  const manualDeckName = el('input', { class: 'input', type: 'text', placeholder: 'Naam van de nieuwe deck' });
+  const manualDeckNameField = el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Naam van de deck' }), manualDeckName]);
+
+  const syncManualDeckField = () => { manualDeckNameField.style.display = manualDeckSelect.value ? 'none' : 'block'; };
+  manualDeckSelect.addEventListener('change', syncManualDeckField);
+  syncManualDeckField();
+
+  /** Bijwerken na een nieuwe deck of kaart, zodat de tellers en "Nieuwe deck"-lijstjes overal kloppen. */
+  function refreshDeckOptions() {
+    for (const select of [deckSelect, manualDeckSelect]) {
+      const current = select.value;
+      clear(select).append(...deckOptions());
+      if (current && store.getDeck(current)) select.value = current;
+    }
+  }
+
+  function addManualCard() {
+    const front = manualFront.value.trim();
+    const back = manualBack.value.trim();
+    if (!front || !back) return toast('Vraag en antwoord zijn allebei nodig');
+
+    let deck = manualDeckSelect.value ? store.getDeck(manualDeckSelect.value) : null;
+    if (!deck) {
+      const name = manualDeckName.value.trim();
+      if (!name) return toast('Geef de nieuwe deck een naam');
+      deck = store.findDeckByName(name) || store.createDeck(name);
+    }
+    store.addCards(deck.id, [{ type: 'basic', front, back }], { skipDuplicates: false });
+
+    toast('Kaart toegevoegd');
+    manualFront.value = '';
+    manualBack.value = '';
+    manualFront.focus();
+    // Eerst de opties verversen — anders bestaat de net aangemaakte deck nog
+    // niet als <option> en blijft de selectie stil op "Nieuwe deck" hangen.
+    refreshDeckOptions();
+    manualDeckSelect.value = deck.id;
+    syncManualDeckField();
+  }
+
   root.append(
     el('h1', { text: 'Kaarten toevoegen' }),
-    el('p', { class: 'muted', style: 'margin-bottom:var(--space-5)', text: 'Laat een AI je lesstof omzetten, plak het resultaat en klaar.' }),
+    el('p', { class: 'muted', style: 'margin-bottom:var(--space-5)', text: 'Typ zelf een kaart, of laat een AI je lesstof omzetten.' }),
+
+    el('div', { class: 'panel' }, [
+      el('h3', { text: 'Zelf typen' }),
+      el('p', { class: 'small muted', text: 'Geen AI nodig — vul een vraag en antwoord in en druk op toevoegen. Handig voor losse kaarten.' }),
+      el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Vraag' }), manualFront]),
+      el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Antwoord' }), manualBack]),
+      el('label', { class: 'field' }, [el('span', { class: 'label', text: 'Deck' }), manualDeckSelect]),
+      manualDeckNameField,
+      el('button', { class: 'btn btn-primary', text: 'Kaart toevoegen', onclick: addManualCard }),
+    ]),
 
     el('div', { class: 'panel' }, [
       el('h3', { text: '1. Laat een AI de kaarten maken' }),

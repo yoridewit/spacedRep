@@ -3,11 +3,12 @@
 Een flashcard-webapp met spaced repetition (Anki-achtig), gemaakt om op je
 iPhone te draaien én op je pc te gebruiken om kaarten toe te voegen.
 
-- **AI maakt de kaarten.** Je laat een externe AI je lesstof omzetten naar een
-  vast JSON-formaat en plakt dat in de app. De app hoeft zelf geen AI aan te
-  roepen — er is dus geen API-sleutel en geen account nodig. De opdracht die je
+- **AI maakt de kaarten, of typ ze zelf.** Je laat een externe AI je lesstof
+  omzetten naar een vast JSON-formaat en plakt dat in de app — geen API-sleutel
+  of account nodig, want de app roept zelf geen AI aan. De opdracht die je
   meekrijgt is gebouwd op Wozniak's twintig regels voor het formuleren van
-  kennis, en past het aantal kaarten aan op de hoeveelheid stof.
+  kennis, en past het aantal kaarten aan op de hoeveelheid stof. Liever geen
+  AI? Vul een vraag en antwoord direct in.
 - **Anki-achtig leren.** SM-2-planner met leerstappen, ease-factor, herleren na
   fouten en daglimieten voor nieuwe kaarten en herhalingen.
 - **Werkt offline.** Alles staat in je eigen browser; geen server nodig.
