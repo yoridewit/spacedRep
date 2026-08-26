@@ -421,6 +421,20 @@ test('hetzelfde deck onder een andere id wordt niet gedupliceerd', () => {
   for (const c of Object.values(state.cards)) eq(c.deckId, 'd_1');
 });
 
+test('een hernoemde deck valt niet terug op de oude naam na sync', () => {
+  // Zelfde id aan beide kanten (al eerder gesynchroniseerd), maar lokaal
+  // hernoemd — waardoor de naam-sleutel verandert. Matchen moet op het
+  // gedeelde id blijven werken, en de nieuwste naam moet winnen.
+  const nieuw = { id: 'd_1', name: 'Nieuwe naam', description: '', created: NOW - 10 * DAY, updatedAt: NOW };
+  const oud = { id: 'd_1', name: 'Oude naam', description: '', created: NOW - 10 * DAY, updatedAt: NOW - DAY };
+  const { state } = mergeStates(
+    { ...emptyDoc(), decks: { d_1: nieuw } },
+    { ...emptyDoc(), decks: { d_1: oud } }
+  );
+  eq(Object.keys(state.decks).length, 1, 'geen dubbele deck');
+  eq(Object.values(state.decks)[0].name, 'Nieuwe naam');
+});
+
 test('dezelfde kaart: de laatst geoefende planning wint', () => {
   const oud = card('c_1', 'd_1', 'Wat is DNA?', { lastReview: NOW - 3 * DAY, interval: 4, state: 'review' });
   const nieuw = card('c_2', 'd_1', 'wat is  DNA? ', { lastReview: NOW - 1 * DAY, interval: 12, state: 'review' });

@@ -141,11 +141,13 @@ class Store extends EventTarget {
   }
 
   createDeck(name, description = '') {
+    const now = Date.now();
     const deck = {
       id: uid('d'),
       name: String(name || 'Nieuwe deck').trim().slice(0, 80) || 'Nieuwe deck',
       description: String(description || '').slice(0, 500),
-      created: Date.now(),
+      created: now,
+      updatedAt: now,
     };
     this.state.decks[deck.id] = deck;
     this.changed({ type: 'deck', id: deck.id });
@@ -155,7 +157,7 @@ class Store extends EventTarget {
   updateDeck(id, patch) {
     const deck = this.state.decks[id];
     if (!deck) return null;
-    Object.assign(deck, patch);
+    Object.assign(deck, patch, { updatedAt: Date.now() });
     this.changed({ type: 'deck', id });
     return deck;
   }

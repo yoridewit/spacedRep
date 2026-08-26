@@ -67,6 +67,7 @@ export function mergeStates(local, remote) {
   // ── decks ──────────────────────────────────────────────────────────────
   const decks = {};
   const byName = new Map();       // genormaliseerde naam -> id in het resultaat
+  const deckById = new Map();     // origineel id (van weerskanten) -> id in het resultaat
   const remap = new Map();        // id aan de andere kant -> id in het resultaat
 
   const addDeck = (deck, from) => {
@@ -74,16 +75,26 @@ export function mergeStates(local, remote) {
     const buried = tombstones.decks[key] || 0;
     if (buried > (deck.created || 0)) return null; // verwijderd, en niet opnieuw aangemaakt
 
-    const existingId = byName.get(key);
-    if (existingId) {
+    // Op id eerst (blijft kloppen na een hernoemen), pas daarna op naam — voor
+    // decks die elkaar nog nooit hebben gezien (apart aangemaakt, zelfde naam).
+    const existingId = deckById.get(deck.id) ?? byName.get(key);
+    if (existingId !== undefined) {
+      deckById.set(deck.id, existingId);
       const existing = decks[existingId];
-      existing.description = existing.description || deck.description || '';
+      if ((deck.updatedAt || 0) > (existing.updatedAt || 0)) {
+        existing.name = deck.name;
+        existing.description = deck.description || '';
+        existing.updatedAt = deck.updatedAt;
+      } else if (!existing.description) {
+        existing.description = deck.description || '';
+      }
       existing.created = Math.min(existing.created || Infinity, deck.created || Infinity);
       remap.set(deck.id, existingId);
       return existingId;
     }
     decks[deck.id] = { ...deck };
     byName.set(key, deck.id);
+    deckById.set(deck.id, deck.id);
     remap.set(deck.id, deck.id);
     if (from === 'remote') summary.decksAdded++;
     return deck.id;
