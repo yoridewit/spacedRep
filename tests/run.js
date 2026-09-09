@@ -16,6 +16,7 @@ import { mergeStates, contentKey } from '../js/merge.js';
 import { dayTotal, mergeDay, normalizeDay } from '../js/daystats.js';
 import { looksSecret } from '../js/keycheck.js';
 import { buildPrompt, suggestCardRange, countWords } from '../js/prompt.js';
+import { GCS_DOMAINS, GCS_SCENARIOS, findingText, totalOf, pickScenario } from '../js/gcs.js';
 
 let passed = 0;
 const failures = [];
@@ -625,6 +626,36 @@ test('publiceerbare sleutels komen er gewoon door', () => {
   assert(!looksSecret('sb_publishable_abc123def456ghi789'), 'sb_publishable-prefix');
   assert(!looksSecret(jwt({ role: 'anon', iss: 'supabase' })), 'anon-JWT');
   assert(!looksSecret(''), 'leeg');
+});
+
+// ── Glasgow Coma Score oefenen ────────────────────────────────────────────
+
+test('elk scenario heeft een geldige score per domein', () => {
+  for (const scenario of GCS_SCENARIOS) {
+    for (const domain of GCS_DOMAINS) {
+      const valid = domain.options.some((o) => o.score === scenario[domain.key]);
+      assert(valid, `${domain.key}=${scenario[domain.key]} bestaat niet in ${scenario.context}`);
+    }
+  }
+});
+
+test('findingText geeft de tekst die bij de score hoort', () => {
+  eq(findingText('eye', 4), 'Opent de ogen spontaan');
+  eq(findingText('motor', 1), 'Geen motorische reactie');
+  eq(findingText('verbal', 3), 'Spreekt inadequate woorden — losse woorden, geen gesprek');
+});
+
+test('totalOf telt de drie domeinen op', () => {
+  eq(totalOf({ eye: 4, verbal: 5, motor: 6 }), 15);
+  eq(totalOf({ eye: 1, verbal: 1, motor: 1 }), 3);
+});
+
+test('pickScenario vermijdt twee keer achter elkaar hetzelfde', () => {
+  const first = pickScenario(-1);
+  for (let i = 0; i < 20; i++) {
+    const next = pickScenario(first.index);
+    eq(next.index === first.index, false);
+  }
 });
 
 // ── het sync-protocol (met een nagebootste server) ───────────────────────

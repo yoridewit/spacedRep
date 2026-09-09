@@ -970,6 +970,34 @@ textarea.input {
 .kbd-hint { display: none; font-size: 12px; color: color-mix(in srgb, var(--color-text) 45%, transparent); text-align: center; }
 @media (min-width: 700px) { .kbd-hint { display: block; } }
 
+/* ── Glasgow Coma Score oefenen ───────────────────────────────────────── */
+
+.gcs-reference { display: grid; gap: var(--space-4); }
+@media (min-width: 600px) { .gcs-reference { grid-template-columns: repeat(3, 1fr); } }
+.gcs-reference-col h4 { margin: 0 0 6px; font-size: 13px; }
+.gcs-reference-col ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.gcs-reference-col li { margin-bottom: 4px; }
+.gcs-reference-col strong { color: var(--color-accent-700); }
+
+.gcs-domain { margin-bottom: var(--space-4); }
+.gcs-domain:last-child { margin-bottom: 0; }
+.gcs-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+.gcs-pick-btn {
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-heading);
+  font-size: 15px;
+  cursor: pointer;
+}
+.gcs-pick-btn.is-selected { border-color: var(--color-accent-700); background: var(--color-accent-100); color: var(--color-accent-900); }
+.gcs-pick-btn.is-correct { border-color: transparent; background: var(--color-accent-2-500); color: var(--color-bg); }
+.gcs-pick-btn.is-wrong { border-color: transparent; background: #a02c2c; color: #fff; }
+
 /* ── animaties ─────────────────────────────────────────────────────────── */
 
 @keyframes confetti-fall {

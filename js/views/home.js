@@ -20,6 +20,15 @@ function syncCard() {
   ]);
 }
 
+/** Los van de kaarten: snel de Glasgow Coma Score oefenen. */
+function gcsCard() {
+  return el('div', { class: 'panel', style: 'margin-bottom:var(--space-6)' }, [
+    el('h3', { style: 'margin-bottom:var(--space-1)', text: 'Glasgow Coma Score' }),
+    el('p', { class: 'small muted', text: 'Los oefenen met realistische EMV-scenario\'s — geen kaarten nodig.' }),
+    el('button', { class: 'btn btn-secondary btn-block', onclick: () => navigate('#/gcs'), text: 'Oefenen' }),
+  ]);
+}
+
 /** Smalle balk met je dagdoel; zichtbare voortgang werkt beter dan een getal. */
 function goalStrip() {
   const goal = dailyProgress(store.stats, store.settings.dailyGoal, Date.now(), store.settings.dayCutoffHour);
@@ -93,6 +102,7 @@ export function mount(root) {
         el('button', { class: 'btn btn-primary', onclick: () => navigate('#/add'), text: 'Kaarten toevoegen' }),
       ]),
       syncCard(),
+      gcsCard(),
       footer()
     );
     return;
@@ -123,6 +133,7 @@ export function mount(root) {
       el('div', { class: 'row', style: 'margin-top:var(--space-6);justify-content:center' }, [
         el('button', { class: 'btn btn-secondary', onclick: () => navigate('#/add'), text: '+ Kaarten toevoegen' }),
       ]),
+      gcsCard(),
       footer(),
     ])
   );
