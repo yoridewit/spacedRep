@@ -22,7 +22,7 @@ function syncCard() {
 
 /** Los van de kaarten: snel de Glasgow Coma Score oefenen. */
 function gcsCard() {
-  return el('div', { class: 'panel', style: 'margin-bottom:var(--space-6)' }, [
+  return el('div', { class: 'panel', style: 'margin-top:var(--space-6);margin-bottom:var(--space-6)' }, [
     el('h3', { style: 'margin-bottom:var(--space-1)', text: 'Glasgow Coma Score' }),
     el('p', { class: 'small muted', text: 'Los oefenen met realistische EMV-scenario\'s — geen kaarten nodig.' }),
     el('button', { class: 'btn btn-secondary btn-block', onclick: () => navigate('#/gcs'), text: 'Oefenen' }),
