@@ -29,7 +29,7 @@ export function mount(root, params = {}) {
 
   root.append(
     el('div', { class: 'row', style: 'justify-content:space-between' }, [
-      el('h1', { class: 'grow', style: 'margin:0', text: deck.name }),
+      el('h1', { class: 'grow', style: 'margin:0', text: deck.name || 'Naamloze deck' }),
       el('button', { class: 'btn btn-secondary btn-sm', text: 'Hernoemen', onclick: rename }),
     ]),
     el('p', { class: 'muted', style: 'margin-top:var(--space-2)', text: deck.description || `${plural(counts.total, 'kaart', 'kaarten')} · ${pct}% onder de knie` }),
@@ -255,7 +255,7 @@ export function mount(root, params = {}) {
   }
 
   function exportDeck() {
-    const safe = deck.name.replace(/[^\w\d-]+/g, '-').toLowerCase().slice(0, 40) || 'deck';
+    const safe = (deck.name || '').replace(/[^\w\d-]+/g, '-').toLowerCase().slice(0, 40) || 'deck';
     downloadJson(`${safe}.json`, store.exportDeck(deck.id));
   }
 

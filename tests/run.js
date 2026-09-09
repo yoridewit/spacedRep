@@ -671,6 +671,30 @@ globalThis.localStorage = {
 const { store } = await import('../js/store.js');
 const sync = await import('../js/sync.js');
 
+// ── decks: een lege naam mag nooit blijven hangen ─────────────────────────
+
+test('een deck aanmaken met een lege naam krijgt een terugval', () => {
+  store.wipe();
+  const deck = store.createDeck('   ');
+  eq(deck.name, 'Nieuwe deck');
+});
+
+test('updateDeck accepteert geen lege naam', () => {
+  store.wipe();
+  const deck = store.createDeck('Biologie');
+  store.updateDeck(deck.id, { name: '   ' });
+  eq(store.getDeck(deck.id).name, 'Biologie', 'oude naam blijft staan in plaats van leeg te worden');
+});
+
+test('findDeckByName en verwijderen crashen niet op een kapotte (naamloze) deck', () => {
+  store.wipe();
+  const broken = store.createDeck('Tijdelijk');
+  broken.name = ''; // simuleert oude, al bestaande kapotte data
+  assert(store.findDeckByName('iets anders') === null, 'zoeken naar een andere naam crasht niet');
+  store.deleteDeck(broken.id);
+  eq(store.getDeck(broken.id), null);
+});
+
 /** Bootst de Supabase-endpoints na en houdt bij wat er langskomt. */
 function fakeServer({ row = null, failFirstPatch = false, expireToken = false } = {}) {
   const calls = [];

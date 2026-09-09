@@ -137,7 +137,7 @@ class Store extends EventTarget {
 
   findDeckByName(name) {
     const norm = String(name || '').trim().toLowerCase();
-    return this.listDecks().find((d) => d.name.trim().toLowerCase() === norm) || null;
+    return this.listDecks().find((d) => String(d.name || '').trim().toLowerCase() === norm) || null;
   }
 
   createDeck(name, description = '') {
@@ -157,14 +157,18 @@ class Store extends EventTarget {
   updateDeck(id, patch) {
     const deck = this.state.decks[id];
     if (!deck) return null;
-    Object.assign(deck, patch, { updatedAt: Date.now() });
+    // Zelfde terugval als bij aanmaken: een deck zonder naam is niet meer aan
+    // te klikken in de lijst — dat is een fout, geen geldige toestand.
+    const clean = { ...patch };
+    if ('name' in clean) clean.name = String(clean.name || '').trim().slice(0, 80) || deck.name || 'Naamloze deck';
+    Object.assign(deck, clean, { updatedAt: Date.now() });
     this.changed({ type: 'deck', id });
     return deck;
   }
 
   deleteDeck(id) {
     const deck = this.state.decks[id];
-    if (deck) this._bury('decks', deck.name.trim().toLowerCase().replace(/\s+/g, ' '));
+    if (deck) this._bury('decks', String(deck.name || '').trim().toLowerCase().replace(/\s+/g, ' '));
     delete this.state.decks[id];
     for (const [cardId, card] of Object.entries(this.state.cards)) {
       if (card.deckId === id) delete this.state.cards[cardId];

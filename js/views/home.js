@@ -67,7 +67,7 @@ function deckCard(deck) {
 
   return el('div', { class: 'deck-card' }, [
     el('div', { class: 'deck-head' }, [
-      el('h3', { text: deck.name }),
+      el('h3', { text: deck.name || 'Naamloze deck' }),
       el('span', { class: `badge-pill ${tone}`, text: label }),
     ]),
     el('div', { class: 'small muted', text: `${counts.new} nieuw · ${pct}% onder de knie` }),
